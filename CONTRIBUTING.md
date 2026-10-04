@@ -50,6 +50,9 @@ modified, run `git add --renormalize .`.
 | `make fmt` | Apply formatting |
 | `make test` | Tests with coverage |
 | `make up` / `make down` / `make health` | Dev services |
+| `make policy-test` | `opa check --strict`, `opa fmt --fail` and the Rego unit tests |
+| `make test-integration` | Tests that need `make up`; a missing service **fails**, it does not skip |
+| `make quickstart` | Run the quickstart with the tamper demo |
 | `make hooks` | Run pre-commit over every file |
 | `make docs` | Serve the docs locally |
 
@@ -99,6 +102,19 @@ Changing it is not an implementation detail:
 - additive and backwards-compatible changes are a minor bump;
 - any removal or signature change is a **major** bump, plus a migration note in
   the same PR.
+
+## Writing policy
+
+Policy is code and gets reviewed like code. Follow the rules in
+[policies/README.md](policies/README.md): conditions are positive, reasons never
+echo model text, and anything not allowed is denied. A rule without a test for
+its *missing-input* case is not finished.
+
+## Integration tests
+
+Some tests need Postgres and OPA. Locally they skip with a reason when the
+service is down; run `make up` first. CI sets `KEELGATE_REQUIRE_INTEGRATION=1`, so
+there a missing service is a failure and a green build cannot hide skipped tests.
 
 ## Dependencies
 

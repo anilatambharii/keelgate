@@ -119,6 +119,18 @@ make down           # stop and delete volumes
 
 `make help` lists every target.
 
+### See it work
+
+```bash
+make quickstart                       # or: python examples/quickstart.py --tamper
+```
+
+It registers a read tool and a paper-trading tool, issues a signed grant, and runs
+four proposals through the gateway: one **allowed**, two **denied** (a restricted
+symbol and an oversized order), and one that **requires a human** and then runs
+after approval. It ends by printing the audit chain, verifying it, and (with
+`--tamper`) showing an edited record and a truncated chain being caught.
+
 ## Safety posture
 
 These are not defaults you can tune away; they are the point of the project.
@@ -134,10 +146,14 @@ policy bypass are in scope and welcome.
 
 ## Project status
 
-**Phase K0 — scaffolding.** The repository layout, toolchain, CI and the
-integration contract surface are in place. The modules under
-[src/keelgate/](src/keelgate/) are intentionally empty: implementations land in
-later phases. `import keelgate` works; nothing gates anything yet.
+**Phase K1 — the policy gate.** The safety core works: signed capability grants,
+a typed tool registry behind a single gateway, an OPA/Rego policy engine with the
+`finance_basic` pack (Cedar optional), a hash-chained audit log, and a
+human-approval queue with a CLI and REST API. Run `make quickstart` to see it.
+
+Not built yet: the agent loop, as-of context, memory, telemetry and evals
+([planned](docs/integration-contract.md#planned)). Known limitations are listed
+in the [security model](docs/security-model.md#known-gaps).
 
 Do not point a production workload at this.
 

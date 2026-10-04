@@ -73,6 +73,8 @@ nav:
   - Security model: security-model.md
   - Decisions:
       - "ADR-0001 Licensing and open core": adr/0001-licensing-and-open-core.md
+      - "ADR-0002 Policy engine": adr/0002-policy-engine.md
+      - "ADR-0003 Capability grants": adr/0003-capability-grants-paseto.md
 
 watch:
   - docs
