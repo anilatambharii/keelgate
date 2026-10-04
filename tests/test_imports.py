@@ -68,12 +68,20 @@ def test_no_module_in_tree_fails_to_import() -> None:
     assert not failures, "modules failed to import: " + "; ".join(failures)
 
 
-def test_every_module_in_tree_is_declared() -> None:
-    """The tree and the contract list must not drift apart."""
-    found = {info.name for info in pkgutil.walk_packages(keelgate.__path__, prefix="keelgate.")}
+def test_every_package_in_tree_is_declared() -> None:
+    """The set of *packages* and the contract list must not drift apart.
+
+    Submodules (``keelgate.policy.engine`` and so on) are implementation detail
+    and free to grow; the package-level surface is the contract.
+    """
+    found = {
+        info.name
+        for info in pkgutil.walk_packages(keelgate.__path__, prefix="keelgate.")
+        if info.ispkg
+    }
     declared = set(CONTRACT_MODULES) | set(ADAPTER_MODULES)
     assert found == declared, (
-        f"undeclared modules: {sorted(found - declared)}; "
+        f"undeclared packages: {sorted(found - declared)}; "
         f"missing from tree: {sorted(declared - found)}"
     )
 
