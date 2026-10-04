@@ -1,0 +1,61 @@
+# Installed by `make setup`. Run over everything with `make hooks`.
+# These hooks are a fast subset of `make check` — they do not replace it.
+minimum_pre_commit_version: "4.0.0"
+
+default_language_version:
+  python: python3
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+        args: [--markdown-linebreak-ext=md]
+      - id: end-of-file-fixer
+      - id: mixed-line-ending
+        args: [--fix=lf]
+      - id: check-yaml
+        # mkdocs.yml carries a `!!python/name:` tag that the strict loader
+        # cannot parse; it is validated by `make docs-build` instead.
+        exclude: ^mkdocs\.yml$
+      - id: check-toml
+      - id: check-json
+      - id: check-merge-conflict
+      - id: check-case-conflict
+      - id: check-illegal-windows-names
+      - id: check-added-large-files
+        # AGENTS.md requires asking before heavy dependencies; the same applies
+        # to committed blobs.
+        args: [--maxkb=1024]
+      - id: check-ast
+      - id: debug-statements
+      - id: detect-private-key
+      - id: detect-aws-credentials
+        args: [--allow-missing-credentials]
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.10
+    hooks:
+      - id: ruff-check
+        args: [--fix, --exit-non-zero-on-fix]
+      - id: ruff-format
+
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.5.0
+    hooks:
+      - id: detect-secrets
+        args: [--baseline, .secrets.baseline]
+        # uv.lock holds hashes that read as high-entropy strings.
+        exclude: ^(uv\.lock|\.secrets\.baseline)$
+
+  - repo: local
+    hooks:
+      # Run through uv so the hook and `make types` use the same resolved
+      # environment, rather than a second pinned copy of mypy.
+      - id: mypy
+        name: mypy --strict (src)
+        entry: uv run mypy
+        language: system
+        types_or: [python, pyi]
+        pass_filenames: false
+        require_serial: true
