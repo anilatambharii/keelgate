@@ -96,6 +96,12 @@ docs = [
 [tool.hatch.build.targets.wheel]
 packages = ["src/keelgate"]
 
+# Ship the default policy pack inside the wheel so `RegoEngine()` works after
+# `pip install keelgate`. Tests (*_test.rego) stay out of the wheel.
+[tool.hatch.build.targets.wheel.force-include]
+"policies/finance_basic/finance_basic.rego" = "keelgate/policy/packs/finance_basic/finance_basic.rego"
+"policies/cedar_minimal/cedar_minimal.cedar" = "keelgate/policy/packs/cedar_minimal/cedar_minimal.cedar"
+
 [tool.hatch.build.targets.sdist]
 include = ["src/keelgate", "tests", "policies", "README.md", "LICENSE"]
 
