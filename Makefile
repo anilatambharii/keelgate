@@ -4,6 +4,16 @@
 
 UV      ?= uv
 COMPOSE ?= docker compose -f docker-compose.dev.yml
+# Rego tooling: a local `opa` binary when present, otherwise the pinned image via the
+# compose `opa-tools` service. Container paths live in the compose file rather than on
+# the command line, which keeps them away from Windows shells that rewrite "/paths".
+ifeq ($(shell command -v opa >/dev/null 2>&1 && echo yes),yes)
+OPA     := opa
+OPA_DIR := policies
+else
+OPA     := $(COMPOSE) run --rm opa-tools
+OPA_DIR := .
+endif
 
 .PHONY: help setup setup-all lock fmt lint format-check types test check \
         up down restart logs health hooks secrets-baseline docs docs-build \
@@ -43,6 +53,20 @@ test: ## Run the test suite with coverage
 
 check: lint format-check types test ## Lint, format-check, type-check and test
 	@echo "make check: PASS"
+
+# ------------------------------------------------------------- policy packs
+policy-lint: ## opa check --strict and opa fmt over the Rego packs
+	$(OPA) check --strict $(OPA_DIR)
+	$(OPA) fmt --fail $(OPA_DIR)
+
+policy-test: policy-lint ## Run the Rego unit tests with real OPA
+	$(OPA) test $(OPA_DIR) -v
+
+test-integration: ## Run the tests that need `make up` (fails, not skips, if a service is down)
+	KEELGATE_REQUIRE_INTEGRATION=1 $(UV) run pytest tests/test_policy_conformance.py tests/test_audit.py tests/test_quickstart.py -p no:cacheprovider --no-cov -rs
+
+quickstart: ## Run the quickstart, including the tamper demo
+	$(UV) run python examples/quickstart.py --tamper
 
 # ---------------------------------------------------------- dev services
 up: ## Start Postgres+pgvector, Redis, OPA and Jaeger, waiting for health
