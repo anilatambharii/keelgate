@@ -64,7 +64,9 @@ services:
       - ./policies:/policies:ro
     healthcheck:
       # The diagnostic port answers /health even while the main port is loading.
-      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8282/health"]
+      # Must be a GET: OPA's /health returns 405 for HEAD, so `wget --spider`
+      # reports the container unhealthy even when OPA is serving correctly.
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8282/health"]
       interval: 5s
       timeout: 3s
       retries: 12

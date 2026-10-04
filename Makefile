@@ -60,7 +60,9 @@ logs: ## Tail dev service logs
 health: ## Probe each dev service from the host
 	$(COMPOSE) ps
 	@echo "--- endpoint probes ---"
-	@pg_isready -h localhost -p 5432 -U keelgate >/dev/null 2>&1 && echo "postgres :5432 ok" || echo "postgres :5432 UNREACHABLE (or pg_isready not installed)"
+	@$(COMPOSE) exec -T postgres pg_isready -U keelgate -d keelgate >/dev/null 2>&1 && echo "postgres :5432 ok" || echo "postgres :5432 UNREACHABLE"
+	@$(COMPOSE) exec -T postgres psql -U keelgate -d keelgate -tAc "select 1 from pg_extension where extname = 'vector'" 2>/dev/null | grep -q 1 && echo "pgvector      ok" || echo "pgvector      MISSING"
+	@$(COMPOSE) exec -T redis redis-cli ping >/dev/null 2>&1 && echo "redis    :6379 ok" || echo "redis    :6379 UNREACHABLE"
 	@curl -fsS -o /dev/null http://localhost:8181/health && echo "opa      :8181 ok" || echo "opa      :8181 UNREACHABLE"
 	@curl -fsS -o /dev/null http://localhost:16686/ && echo "jaeger   :16686 ok" || echo "jaeger   :16686 UNREACHABLE"
 	@curl -fsS -o /dev/null http://localhost:14269/ && echo "jaeger otlp admin :14269 ok" || echo "jaeger admin :14269 UNREACHABLE"
