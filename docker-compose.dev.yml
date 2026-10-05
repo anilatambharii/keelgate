@@ -86,6 +86,16 @@ services:
     # No healthcheck: this image ships no shell or HTTP client to probe itself
     # with. `make health` probes :16686 and :14269 from the host instead.
 
+  opa-tools:
+    # One-shot OPA CLI for `make policy-test` / `make policy-lint`. The `tools` profile
+    # keeps it out of `make up`; run it with `docker compose run --rm opa-tools <args>`.
+    image: openpolicyagent/opa:1.9.0
+    profiles: ["tools"]
+    entrypoint: ["/opa"]
+    working_dir: /policies
+    volumes:
+      - ./policies:/policies:ro
+
 volumes:
   postgres-data:
   redis-data:

@@ -61,11 +61,10 @@ The reasoning behind each is in the [security model](security-model.md).
 
 ## Project status
 
-!!! warning "Phase K0 — scaffolding"
-    The repository layout, toolchain, CI and the integration contract surface
-    are in place. The modules under `src/keelgate/` are intentionally empty:
-    implementations land in later phases. `import keelgate` works; nothing gates
-    anything yet.
+!!! warning "Phase K1 — the policy gate"
+    Capabilities, tools, policy, audit and approvals are implemented and tested.
+    The loop, context, memory, telemetry and evals are not built yet. Read the
+    [known gaps](security-model.md#known-gaps) before relying on it.
 
     Do not point a production workload at this.
 

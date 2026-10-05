@@ -113,6 +113,45 @@ jobs:
             exit 1
           fi
 
+      - name: The wheel ships the policy pack but not its tests
+        run: |
+          wheel="$(ls dist/*.whl)"
+          listing="$(python3 -m zipfile -l "$wheel")"
+          echo "$listing" | grep -q 'keelgate/policy/packs/finance_basic/finance_basic.rego'             || { echo "finance_basic.rego missing from the wheel"; exit 1; }
+          if echo "$listing" | grep -q '_test.rego'; then
+            echo "Rego tests must not ship in the wheel"; exit 1
+          fi
+
+      - name: The wheel works on its own, with no repository checkout
+        run: |
+          cd "$(mktemp -d)"
+          uv run --isolated --no-project --with "$GITHUB_WORKSPACE"/dist/*.whl python - <<'PY'
+          import asyncio
+          from datetime import UTC, datetime
+          from keelgate.policy import (
+              PolicyAction, PolicyActor, PolicyContext, PolicyInput, RegoEngine, pack_path,
+          )
+
+          assert "site-packages" in str(pack_path("finance_basic")), "pack not read from the wheel"
+          limits = {
+              "max_notional_per_action": 50000, "max_daily_exposure": 100000,
+              "restricted_symbols": ["TSLA"], "approval_one_click_notional": 10000,
+              "approval_explicit_notional": 25000,
+              "trading_hours": {"tz": "America/New_York", "open_minute": 570, "close_minute": 960},
+          }
+          decision = asyncio.run(RegoEngine().decide(PolicyInput(
+              action=PolicyAction(tool="t", side_effect="WRITE", capability="trade:paper_execute"),
+              actor=PolicyActor(agent_id="a", tenant_id="t", grant_id="g"),
+              resource={"symbol": "AAPL", "notional": 100},
+              context=PolicyContext(
+                  as_of=datetime(2026, 10, 5, 14, 30, tzinfo=UTC),
+                  limits=limits, exposure={"daily_notional": 0},
+              ),
+          )))
+          assert decision.effect.value == "ALLOW", decision
+          print("wheel ok:", decision.effect.value)
+          PY
+
       - uses: actions/upload-artifact@v7
         with:
           name: dist
@@ -133,3 +172,58 @@ jobs:
 
       - name: Build the docs with warnings as errors
         run: uv run --group docs mkdocs build --strict
+
+  policy:
+    # Real OPA over the Rego packs. The Python suite also evaluates them, but only a
+    # real `opa test` proves the pack is valid Rego in the implementation production uses.
+    name: policy packs (opa check, fmt, test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: open-policy-agent/setup-opa@v2.4.0
+        with:
+          version: 1.9.0
+
+      - name: Check (strict)
+        run: opa check --strict policies
+
+      - name: Formatting
+        run: opa fmt --fail policies
+
+      - name: Unit tests
+        run: opa test policies -v
+
+  integration:
+    # The tests that need real services. KEELGATE_REQUIRE_INTEGRATION turns a missing
+    # service into a failure: a suite that quietly skips these proves nothing.
+    name: integration (Postgres + OPA)
+    runs-on: ubuntu-latest
+    env:
+      KEELGATE_REQUIRE_INTEGRATION: "1"
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          python-version: "3.11"
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - run: uv sync --frozen
+
+      - name: Start Postgres and OPA from the dev stack
+        run: docker compose -f docker-compose.dev.yml up -d --wait postgres opa
+
+      - name: Conformance (both Rego engines), Postgres audit, quickstart against real OPA
+        run: >-
+          uv run pytest tests/test_policy_conformance.py tests/test_audit.py
+          tests/test_quickstart.py --no-cov -rs -p no:cacheprovider
+
+      - name: Service logs
+        if: failure()
+        run: docker compose -f docker-compose.dev.yml logs --no-color
+
+      - name: Tear down
+        if: always()
+        run: docker compose -f docker-compose.dev.yml down -v

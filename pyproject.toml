@@ -32,7 +32,12 @@ dependencies = [
     "httpx>=0.28,<1",
     "opentelemetry-api>=1.45,<2",
     "opentelemetry-sdk>=1.45,<2",
+    "pyseto>=1.10,<2",      # PASETO v4.public capability grants
+    "regopy>=1.5,<2",       # in-process Rego evaluation (tests, quickstart, local)
 ]
+
+[project.scripts]
+keelgate-approvals = "keelgate.approvals.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/anilatambharii/keelgate"
@@ -78,6 +83,10 @@ dev = [
     "ruff>=0.16",
     "pre-commit>=4.6",
     "detect-secrets>=1.5",
+    "fastapi>=0.142",            # REST approvals tests
+    "cedarpy>=4.12",             # exercises the optional Cedar backend in tests
+    "httpx2>=1",                 # what starlette's TestClient now expects
+    "psycopg[binary]>=3.3",      # Postgres audit backend tests
 ]
 docs = [
     "mkdocs-material>=9.7",
@@ -86,6 +95,12 @@ docs = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/keelgate"]
+
+# Ship the default policy pack inside the wheel so `RegoEngine()` works after
+# `pip install keelgate`. Tests (*_test.rego) stay out of the wheel.
+[tool.hatch.build.targets.wheel.force-include]
+"policies/finance_basic/finance_basic.rego" = "keelgate/policy/packs/finance_basic/finance_basic.rego"
+"policies/cedar_minimal/cedar_minimal.cedar" = "keelgate/policy/packs/cedar_minimal/cedar_minimal.cedar"
 
 [tool.hatch.build.targets.sdist]
 include = ["src/keelgate", "tests", "policies", "README.md", "LICENSE"]
@@ -126,10 +141,25 @@ ignore = [
     "ISC001",     # conflicts with the formatter
     "TRY003",     # long messages outside exception class — we want readable errors
     "PLR0913",    # many arguments; policy/tool signatures are wide by nature
+    "TRY300",     # style: a return inside try is fine when the try body is the work
+    "TRY301",     # style: raising inside try to reuse one except clause is deliberate
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S101", "PLR2004", "ARG", "ERA001"]
+# Tests and the demo are not shipped, and deliberately do things library code must not:
+# assert, poke privates, hold dummy secrets, import locally to mutate the gateway.
+"tests/**" = [
+    "S101", "S105", "S106", "PLR2004", "PLR0915", "PLR0917", "ARG", "ERA001", "SLF001",
+    "PLC0415", "TC001", "TC002", "TC003", "RUF043", "SIM117", "E501",
+]
+"examples/**" = ["T20", "PLR0915"]
+
+[tool.ruff.lint.flake8-type-checking]
+# Pydantic evaluates field annotations at runtime, so they must stay real imports.
+runtime-evaluated-base-classes = ["pydantic.BaseModel"]
+
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Header"]
 
 [tool.ruff.lint.flake8-tidy-imports]
 ban-relative-imports = "parents"
@@ -152,13 +182,19 @@ enable_error_code = [
     "possibly-undefined",
 ]
 pretty = true
+plugins = ["pydantic.mypy"]
+
+[tool.pydantic-mypy]
+init_forbid_extra = true
+init_typed = true
+warn_required_dynamic_aliases = true
 
 [[tool.mypy.overrides]]
 # Optional integrations are not installed in the default dev env.
 module = [
     "langgraph.*", "langgraph_checkpoint.*", "openai.*", "agents.*",
     "anthropic.*", "claude_agent_sdk.*", "temporalio.*", "cedarpy.*",
-    "mcp.*", "a2a.*",
+    "mcp.*", "a2a.*", "regopy.*", "pyseto.*", "psycopg.*",
 ]
 ignore_missing_imports = true
 
