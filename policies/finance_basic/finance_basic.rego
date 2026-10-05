@@ -96,6 +96,13 @@ shape_ok if {
 	input.action.side_effect == "WRITE"
 }
 
+# Accepting a task from another agent (A2A intake) is a proposal, not an effect: it starts
+# work that is itself gated action by action. The paper-only rule still applies to it.
+shape_ok if {
+	input.action.capability == "a2a:task_submit"
+	input.action.side_effect == "PROPOSE"
+}
+
 is_trade if input.action.capability in trade_capabilities
 
 is_trade_write if {
