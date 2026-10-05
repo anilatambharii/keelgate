@@ -1,18 +1,19 @@
 # gitleaks configuration. Keeps every default rule and adds one narrow exception.
+#
+# Uses the singular [allowlist] table on purpose: it is understood by every gitleaks 8.x,
+# including the version bundled with gitleaks-action, whereas [[allowlists]] needs 8.25+.
 
 title = "keelgate gitleaks config"
 
 [extend]
 useDefault = true
 
-# A test sentinel, not a credential. tests/test_context.py plants this string in a
+[allowlist]
+# A test sentinel, not a credential. tests/test_context.py plants "FUTURE-SECRET" in a
 # future-dated context item to prove that rejected content is never echoed back; the word
-# "SECRET" in it trips the generic-api-key rule. The rule captures the value after the string
-# (here a variable name), so the exception matches the whole line. Both the path and the exact
-# quoted string must match, so this exempts nothing else in that file or anywhere else.
-[[allowlists]]
+# "SECRET" in it trips the generic-api-key rule. That rule captures the value after the string
+# (here a variable name), so the exception matches the whole line. Only a line containing this
+# exact quoted string is exempt.
 description = "Sentinel string in the as_of leakage test"
-condition = "AND"
-paths = ['''^tests/test_context\.py$''']
 regexTarget = "line"
 regexes = ['''"FUTURE-SECRET"''']
