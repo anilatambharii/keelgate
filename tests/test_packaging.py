@@ -13,7 +13,10 @@ import keelgate
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 # Extras promised by AGENTS.md / the K0 brief.
-EXPECTED_EXTRAS = {"langgraph", "openai", "anthropic", "temporal", "cedar", "server"}
+# K2 added google, mcp and a2a (Gemini, the MCP SDK, the A2A SDK).
+EXPECTED_EXTRAS = {
+    "langgraph", "openai", "anthropic", "temporal", "cedar", "server", "google", "mcp", "a2a",
+}  # fmt: skip
 
 
 @pytest.fixture(scope="module")

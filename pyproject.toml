@@ -39,6 +39,10 @@ dependencies = [
 [project.scripts]
 keelgate-approvals = "keelgate.approvals.cli:main"
 
+# Fixtures for downstream projects' tests; loaded by pytest automatically.
+[project.entry-points.pytest11]
+keelgate = "keelgate.testing.plugin"
+
 [project.urls]
 Homepage = "https://github.com/anilatambharii/keelgate"
 Repository = "https://github.com/anilatambharii/keelgate"
@@ -64,6 +68,15 @@ anthropic = [
 temporal = [
     "temporalio>=1.34,<2",
 ]
+google = [
+    "google-genai>=2.28,<3",
+]
+mcp = [
+    "mcp>=2.3,<3",
+]
+a2a = [
+    "a2a-sdk>=1.2,<2",
+]
 cedar = [
     "cedarpy>=4.12,<5",
 ]
@@ -85,6 +98,17 @@ dev = [
     "detect-secrets>=1.5",
     "fastapi>=0.142",            # REST approvals tests
     "cedarpy>=4.12",             # exercises the optional Cedar backend in tests
+    # Every optional integration, so its adapter is exercised in tests rather than assumed.
+    "langgraph>=1.2",
+    "langgraph-checkpoint-sqlite>=3.1",
+    "openai>=3.24",
+    "openai-agents>=0.23",
+    "anthropic>=1.11",
+    "claude-agent-sdk>=0.2",
+    "google-genai>=2.28",
+    "mcp>=2.3",
+    "a2a-sdk>=1.2",
+    "temporalio>=1.34",
     "httpx2>=1",                 # what starlette's TestClient now expects
     "psycopg[binary]>=3.3",      # Postgres audit backend tests
 ]
@@ -146,6 +170,9 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
+# The _check_write / _embedding_for / _record_id_for hooks share one signature across all four
+# tiers; each tier uses only the arguments it needs.
+"src/keelgate/memory/tiers.py" = ["ARG002"]
 # Tests and the demo are not shipped, and deliberately do things library code must not:
 # assert, poke privates, hold dummy secrets, import locally to mutate the gateway.
 "tests/**" = [
@@ -194,7 +221,7 @@ warn_required_dynamic_aliases = true
 module = [
     "langgraph.*", "langgraph_checkpoint.*", "openai.*", "agents.*",
     "anthropic.*", "claude_agent_sdk.*", "temporalio.*", "cedarpy.*",
-    "mcp.*", "a2a.*", "regopy.*", "pyseto.*", "psycopg.*",
+    "mcp.*", "a2a.*", "regopy.*", "pyseto.*", "psycopg.*", "jsonschema.*",
 ]
 ignore_missing_imports = true
 
@@ -207,6 +234,9 @@ addopts = [
     "--strict-markers",
     "--strict-config",
     "--import-mode=importlib",
+    # The keelgate pytest plugin is loaded from tests/conftest.py instead of its entry point:
+    # entry-point plugins import keelgate before coverage starts, which hides its top-level lines.
+    "-p", "no:keelgate",
     "--cov=keelgate",
     "--cov-report=term-missing",
     "--cov-report=xml",
