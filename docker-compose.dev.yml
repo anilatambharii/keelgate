@@ -1,0 +1,91 @@
+# Local development stack for Keelgate. Not a production topology.
+#   make up    start and wait for health
+#   make down  stop and delete volumes
+#
+# Credentials here are deliberately weak, local-only placeholders. They are safe
+# to commit because nothing in this file is ever reachable off localhost.
+
+name: keelgate-dev
+
+services:
+  postgres:
+    # pgvector ships on top of the official Postgres 16 image; the semantic
+    # memory layer needs the `vector` extension.
+    image: pgvector/pgvector:pg16
+    container_name: keelgate-postgres
+    environment:
+      POSTGRES_USER: keelgate
+      POSTGRES_PASSWORD: keelgate  # pragma: allowlist secret
+      POSTGRES_DB: keelgate
+      # Deterministic collation so ordering is identical across machines.
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./deploy/docker/initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keelgate -d keelgate"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  redis:
+    image: redis:7-alpine
+    container_name: keelgate-redis
+    command: ["redis-server", "--appendonly", "yes", "--save", "60", "1"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  opa:
+    # Default policy decision point. The `-debug` tag is the variant that ships a
+    # shell, which the healthcheck below needs; the static image has none.
+    image: openpolicyagent/opa:1.9.0-debug
+    container_name: keelgate-opa
+    command:
+      - "run"
+      - "--server"
+      - "--addr=0.0.0.0:8181"
+      - "--diagnostic-addr=0.0.0.0:8282"
+      - "--log-level=info"
+      - "--set=decision_logs.console=true"
+      - "/policies"
+    ports:
+      - "8181:8181"
+    volumes:
+      - ./policies:/policies:ro
+    healthcheck:
+      # The diagnostic port answers /health even while the main port is loading.
+      # Must be a GET: OPA's /health returns 405 for HEAD, so `wget --spider`
+      # reports the container unhealthy even when OPA is serving correctly.
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8282/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 5s
+
+  jaeger:
+    # All-in-one tracing backend speaking OTLP. UI on :16686.
+    image: jaegertracing/all-in-one:1.62.0
+    container_name: keelgate-jaeger
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "16686:16686"   # UI
+      - "4317:4317"     # OTLP gRPC  — OTEL_EXPORTER_OTLP_ENDPOINT
+      - "4318:4318"     # OTLP HTTP
+      - "14269:14269"   # admin / health
+    # No healthcheck: this image ships no shell or HTTP client to probe itself
+    # with. `make health` probes :16686 and :14269 from the host instead.
+
+volumes:
+  postgres-data:
+  redis-data:

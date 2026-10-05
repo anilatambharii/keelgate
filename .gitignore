@@ -1,0 +1,57 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+*.so
+
+# Environments
+.venv/
+venv/
+.python-version
+
+# Secrets — never commit real values; see .env.example
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+
+# Tooling caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
+# Docs
+site/
+
+# Local state (durable loops, audit logs, checkpoints)
+*.sqlite
+*.sqlite3
+*.db
+.keelgate/
+
+# Editors / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+
+# Node (ee/dashboard)
+node_modules/
+.next/

@@ -1,0 +1,198 @@
+[build-system]
+requires = ["hatchling>=1.32"]
+build-backend = "hatchling.build"
+
+[project]
+name = "keelgate"
+version = "0.1.0"
+description = "Safety-first agent harness for AI agents that touch money and regulated actions. The LLM proposes; deterministic code decides."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+authors = [{ name = "The Keelgate Authors" }]
+keywords = [
+    "agents", "llm", "safety", "guardrails", "policy-as-code", "audit",
+    "human-in-the-loop", "opentelemetry", "fintech", "governance",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Financial and Insurance Industry",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Application Frameworks",
+    "Topic :: Security",
+    "Typing :: Typed",
+]
+dependencies = [
+    "pydantic>=2.11,<3",
+    "httpx>=0.28,<1",
+    "opentelemetry-api>=1.45,<2",
+    "opentelemetry-sdk>=1.45,<2",
+]
+
+[project.urls]
+Homepage = "https://github.com/anilatambharii/keelgate"
+Repository = "https://github.com/anilatambharii/keelgate"
+Issues = "https://github.com/anilatambharii/keelgate/issues"
+Documentation = "https://github.com/anilatambharii/keelgate/tree/main/docs"
+
+# Optional integrations. Keelgate wraps these frameworks; it never requires them.
+# Install only what you adapt to, e.g. `pip install "keelgate[langgraph]"`.
+[project.optional-dependencies]
+langgraph = [
+    "langgraph>=1.2,<2",
+    "langgraph-checkpoint-sqlite>=3.1,<4",
+    "langgraph-checkpoint-postgres>=3.1,<4",
+]
+openai = [
+    "openai>=3.24,<4",
+    "openai-agents>=0.23,<1",
+]
+anthropic = [
+    "anthropic>=1.11,<2",
+    "claude-agent-sdk>=0.2,<1",
+]
+temporal = [
+    "temporalio>=1.34,<2",
+]
+cedar = [
+    "cedarpy>=4.12,<5",
+]
+server = [
+    "fastapi>=0.142,<1",
+    "uvicorn[standard]>=0.54,<1",
+    "psycopg[binary,pool]>=3.3,<4",
+    "redis>=8.1,<9",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1",
+    "pytest-cov>=7.1",
+    "hypothesis>=6.168",
+    "mypy>=2.4",
+    "ruff>=0.16",
+    "pre-commit>=4.6",
+    "detect-secrets>=1.5",
+]
+docs = [
+    "mkdocs-material>=9.7",
+    "mkdocstrings[python]>=1.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/keelgate"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src/keelgate", "tests", "policies", "README.md", "LICENSE"]
+
+# --------------------------------------------------------------------- ruff
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "tests"]
+extend-exclude = ["ee/dashboard", "deploy"]
+
+[tool.ruff.lint]
+select = [
+    "E", "W",     # pycodestyle
+    "F",          # pyflakes
+    "I",          # isort
+    "N",          # pep8-naming
+    "UP",         # pyupgrade
+    "B",          # bugbear
+    "A",          # builtins shadowing
+    "C4",         # comprehensions
+    "DTZ",        # timezone-aware datetimes — as_of correctness depends on this
+    "T20",        # no print() in library code
+    "SIM",        # simplify
+    "TC",         # type-checking imports
+    "PTH",        # pathlib
+    "RUF",
+    "S",          # bandit — security lint
+    "ASYNC",
+    "LOG", "G",   # logging correctness
+    "PL",         # pylint subset
+    "TRY",        # exception antipatterns
+    "ARG",        # unused arguments
+    "PGH",        # no blanket type: ignore
+    "ERA",        # commented-out code
+]
+ignore = [
+    "ISC001",     # conflicts with the formatter
+    "TRY003",     # long messages outside exception class — we want readable errors
+    "PLR0913",    # many arguments; policy/tool signatures are wide by nature
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "PLR2004", "ARG", "ERA001"]
+
+[tool.ruff.lint.flake8-tidy-imports]
+ban-relative-imports = "parents"
+
+[tool.ruff.format]
+docstring-code-format = true
+
+# -------------------------------------------------------------------- mypy
+# AGENTS.md: `mypy --strict` on src/.
+[tool.mypy]
+python_version = "3.11"
+files = ["src"]
+strict = true
+warn_unreachable = true
+warn_no_return = true
+enable_error_code = [
+    "redundant-expr",
+    "truthy-bool",
+    "ignore-without-code",
+    "possibly-undefined",
+]
+pretty = true
+
+[[tool.mypy.overrides]]
+# Optional integrations are not installed in the default dev env.
+module = [
+    "langgraph.*", "langgraph_checkpoint.*", "openai.*", "agents.*",
+    "anthropic.*", "claude_agent_sdk.*", "temporalio.*", "cedarpy.*",
+    "mcp.*", "a2a.*",
+]
+ignore_missing_imports = true
+
+# ------------------------------------------------------------------ pytest
+[tool.pytest.ini_options]
+minversion = "9.0"
+testpaths = ["tests"]
+addopts = [
+    "-ra",
+    "--strict-markers",
+    "--strict-config",
+    "--import-mode=importlib",
+    "--cov=keelgate",
+    "--cov-report=term-missing",
+    "--cov-report=xml",
+    "--cov-fail-under=85",
+]
+markers = [
+    "slow: long-running tests, deselect with -m 'not slow'",
+    "integration: needs `make up` services (Postgres/Redis/OPA)",
+]
+filterwarnings = ["error"]
+
+# ---------------------------------------------------------------- coverage
+[tool.coverage.run]
+source = ["src/keelgate"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+exclude_also = [
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    '@(abc\.)?abstractmethod',
+    "@overload",
+    "if __name__ == .__main__.:",
+]

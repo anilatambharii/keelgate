@@ -1,0 +1,26 @@
+Keelgate Enterprise Edition License
+===================================
+
+Copyright 2026 The Keelgate Authors. All rights reserved.
+
+PROPRIETARY AND CONFIDENTIAL — PLACEHOLDER
+
+The contents of this `ee/` directory ("Enterprise Edition", "Keelgate Cloud") are
+NOT covered by the Apache License, Version 2.0 that governs the remainder of this
+repository. They are proprietary software.
+
+No license, right, or interest in the Enterprise Edition is granted to you except
+under a separate written commercial agreement with the copyright holder. Absent
+such an agreement you may NOT use, copy, modify, merge, publish, distribute,
+sublicense, sell, or create derivative works of any part of this directory.
+
+Viewing this source is permitted for evaluation and security review only.
+
+Everything outside `ee/` is open source under Apache-2.0; see the LICENSE file at
+the repository root. The boundary between the two is documented in
+docs/adr/0001-licensing-and-open-core.md.
+
+THE ENTERPRISE EDITION IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
+
+NOTE: This is a placeholder pending final commercial license terms and counsel
+review. Treat its scope as authoritative and its wording as provisional.

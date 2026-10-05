@@ -1,0 +1,135 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# A new push to a PR supersedes the previous run.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  FORCE_COLOR: "1"
+
+jobs:
+  check:
+    name: check (py${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install uv and Python ${{ matrix.python-version }}
+        uses: astral-sh/setup-uv@v10.2.0
+        with:
+          python-version: ${{ matrix.python-version }}
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Sync the dev environment
+        run: uv sync --frozen
+
+      # The gate's stages run separately so a failure names itself in the UI,
+      # while `make check` stays the single local entrypoint.
+      - name: Lint (ruff check)
+        run: uv run ruff check --output-format=github .
+
+      - name: Format check (ruff format)
+        run: uv run ruff format --check --diff .
+
+      - name: Types (mypy --strict)
+        run: uv run mypy
+
+      - name: Tests
+        run: uv run pytest
+
+      - name: Verify the installed package imports
+        run: uv run python -c "import keelgate; print(keelgate.__version__)"
+
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-py${{ matrix.python-version }}
+          path: coverage.xml
+          if-no-files-found: warn
+          retention-days: 7
+
+  extras:
+    # The extras are the integration contract's install surface. Resolve and
+    # install them here so a bad pin is caught by us, not by a downstream
+    # project such as Tycheon.
+    name: resolve all extras
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          python-version: "3.11"
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: The committed lockfile must be current
+        run: uv lock --check
+
+      - name: Install with every extra and group
+        run: uv sync --all-extras --all-groups
+
+      - name: Import the package with every adapter dependency present
+        run: uv run python -c "import keelgate; print('ok', keelgate.__version__)"
+
+  build:
+    name: build distributions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          python-version: "3.11"
+          enable-cache: true
+
+      - name: Build wheel and sdist
+        run: uv build
+
+      - name: The wheel must ship py.typed
+        run: |
+          wheel="$(ls dist/*.whl)"
+          if python3 -m zipfile -l "$wheel" | grep -q 'keelgate/py.typed'; then
+            echo "py.typed present in $wheel"
+          else
+            echo "py.typed missing from $wheel — downstream mypy would see Any"
+            exit 1
+          fi
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: dist/
+          retention-days: 7
+
+  docs:
+    name: docs build (strict)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          python-version: "3.11"
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Build the docs with warnings as errors
+        run: uv run --group docs mkdocs build --strict

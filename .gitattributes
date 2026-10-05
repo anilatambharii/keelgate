@@ -1,0 +1,11 @@
+# Normalize to LF in the repo so ruff, pre-commit and CI agree across Windows/Linux.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+
+LICENSE   text eol=lf linguist-vendored
+ee/LICENSE text eol=lf

@@ -1,0 +1,78 @@
+site_name: Keelgate
+site_description: >-
+  Safety-first agent harness for AI agents that touch money and regulated
+  actions. The LLM proposes; deterministic code decides.
+site_author: The Keelgate Authors
+site_url: https://anilatambharii.github.io/keelgate/
+
+repo_url: https://github.com/anilatambharii/keelgate
+repo_name: anilatambharii/keelgate
+edit_uri: edit/main/docs/
+copyright: Copyright 2026 The Keelgate Authors — Apache-2.0
+
+theme:
+  name: material
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+    - content.code.annotate
+    - content.action.edit
+    - search.highlight
+    - search.suggest
+    - toc.follow
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+
+plugins:
+  - search
+  # mkdocstrings is installed in the `docs` dependency group and gets enabled
+  # here once there is a public API to generate a reference from.
+
+markdown_extensions:
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+
+nav:
+  - Home: index.md
+  - Integration contract: integration-contract.md
+  - Security model: security-model.md
+  - Decisions:
+      - "ADR-0001 Licensing and open core": adr/0001-licensing-and-open-core.md
+
+watch:
+  - docs
