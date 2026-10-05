@@ -144,6 +144,9 @@ same files), **resumes from its checkpoint** without re-planning, places its pap
 order exactly once, and then **serves the same governed tools over MCP**, where a
 restricted-symbol order is denied by policy.
 
+Provider clients are contract-tested offline; `make test-live` runs opt-in smoke tests against the
+real services when you supply keys.
+
 Testing something built on Keelgate? `keelgate.testing` ships `FakeLLM`, a governed
 test harness and pytest fixtures (`fake_llm`, `governed_harness`, `static_policy`,
 `keelgate_clock`) that load automatically once Keelgate is installed.

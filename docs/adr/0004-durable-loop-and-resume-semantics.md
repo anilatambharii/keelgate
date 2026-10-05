@@ -119,6 +119,26 @@ with `side_effect_not_permitted` even if the grant would allow them.
   duplicate downstream. Keelgate refuses to guess; it does not remove the need
   for the downstream system to honour the key.
 
+## Amendments
+
+Added after the first K2 review, without changing the decisions above:
+
+- **Pre-call budget check.** Before each planning call the loop estimates the prompt's size
+  and refuses a call whose *input alone* would cross the token budget; given a pricing table
+  (`pricing=`, `price_model=`) it does the same for the dollar budget. The stopped step does
+  not count as an iteration, and a resume with more budget retries it. Output remains
+  unknowable, so a call can still overshoot by its output; cap it with the request's
+  `max_tokens`.
+- **Outcome confirmer.** `Loop(confirmer=...)` accepts trusted harness code that asks the
+  downstream system of record whether an unknown-outcome WRITE took effect. A definite `True`
+  settles it as done, a definite `False` abandons it (never retried under the same key);
+  anything else leaves it for a human, exactly as before. The model's or the tool's own claim
+  is never accepted as confirmation. Confirmer decisions and human reconciles are both written
+  to the audit chain as `loop.reconciled` events (actor, source, verdict; never arguments).
+- **LangGraph store across processes.** `.sqlite(path)` now takes a cross-process lock (a
+  separate lock file held under `BEGIN IMMEDIATE`) around the read-then-write stale check,
+  proven by a multi-process race test that fails without the lock.
+
 ## Alternatives considered
 
 - **Re-plan on resume.** Simpler, but a different plan could duplicate or skip a

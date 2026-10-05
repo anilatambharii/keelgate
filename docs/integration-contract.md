@@ -31,6 +31,20 @@ unsupported, and it may change in a patch release.
 Deprecations are announced for at least one minor release before removal. A
 breaking change may not merge without its migration note.
 
+## Stability tiers
+
+Not everything on this page carries the same promise. Keelgate is pre-1.0, so the tiers below
+say what a downstream project can lean on today and what it should expect to move.
+
+| Tier | Meaning | What is in it |
+|---|---|---|
+| **Stable** | Follows the policy above. A breaking change needs a major bump and a migration note. | The K1 safety core (`tools`, `capabilities`, `policy`, `audit`, `approvals`); `Loop`, `StopConditions`, `LoopResult`, `StopReason`, `CheckpointStore`; `ContextBuilder`, `ContextItem`; the `Memory` interface and the four tiers; the `LLMClient` protocol and its request, response and error types; `FakeLLM`; `GovernedToolset` |
+| **Provisional** | Works and is tested, but may change in a **minor** release, with a changelog entry. Pin a minor version if you depend on it. | `keelgate.llm.providers.*` (vendor SDKs move fast); `keelgate.adapters.*` (wrapped frameworks move too); memory backends and embedders; the Temporal runner; `keelgate.testing` harness and pytest fixture names; `OutcomeConfirmer`; `LoopRunner` and `LoopSpec` |
+
+A symbol moves from Provisional to Stable when a downstream project has used it through a
+release without needing a change. The security guarantees at the end of this page are not
+tiered: they hold for every symbol in both tiers.
+
 ## Implemented
 
 ### `keelgate.tools`
@@ -113,18 +127,23 @@ invalidates every existing chain and is a major change.
 
 | Symbol | Kind | Notes |
 |---|---|---|
-| `Loop(gateway=, registry=, planner=, checkpoints=, grant_token=, policy_context=, stop=, verifier=, ...)` | class | `await loop.run(goal=, tenant_id=, agent_id=, as_of=, run_id=)`, `resume(tenant_id, run_id, stop=)`, `run_or_resume(...)`, `reconcile(...)` |
+| `Loop(gateway=, registry=, planner=, checkpoints=, grant_token=, policy_context=, stop=, verifier=, pricing=, price_model=, confirmer=, ...)` | class | `await loop.run(goal=, tenant_id=, agent_id=, as_of=, run_id=)`, `resume(tenant_id, run_id, stop=)`, `run_or_resume(...)`, `reconcile(...)` |
 | `StopConditions(max_iterations, max_tokens, max_dollars, timeout, max_verifier_rejections, goal)` | dataclass | Every limit is optional; the first reached wins. A stop is not a failure |
 | `StopReason`, `LoopResult` | types | `result.ok`, `result.resumable`, `result.stop_reason`, `result.final_answer`. Reasons include `goal_reached`, `max_iterations`, `token_budget`, `dollar_budget`, `timeout`, `verifier_rejections`, `outcome_unknown`, `cost_unknown`, `approval_pending`, `error` |
 | `Planner`, `LLMPlanner`, `Verifier`, `AcceptAllVerifier`, `CallableVerifier`, `LLMVerifier` | roles | The model proposes plans and verdicts; neither can execute anything |
+| `OutcomeConfirmer` | protocol | Optional, trusted harness code that asks the downstream system of record whether an unknown-outcome WRITE took effect. Only a definite `True` or `False` settles it; `None`, an error or a non-bool leaves it for a human |
 | `CheckpointStore`, `InMemoryCheckpointStore`, `SqliteCheckpointStore`, `StaleCheckpointError`, `default_checkpointer` | stores | Atomic save; a sequence that is not newer is refused |
-| `keelgate.loop.langgraph_store.LangGraphCheckpointStore` | store | Extra `keelgate[langgraph]`. Thread-safe, **not** multi-process safe (see ADR-0004) |
+| `keelgate.loop.langgraph_store.LangGraphCheckpointStore` | store | Extra `keelgate[langgraph]`. Safe between threads and, with `.sqlite(path)` on a file, between processes (a lock file guards the stale-writer check). With a saver you build yourself, pass `process_lock=` or it is thread-safe only |
 | `LoopRunner`, `LoopSpec`, `LoopOutcome`, `InProcessRunner` | interface | How a run is (re)started; the Temporal adapter implements it |
 | `VerificationLoop`, `MonitorLoop`, `Schedule`, `LoopType` | kinds | Verification and monitor loops are READ-only by default, enforced by the gateway |
 
 Guarantees: planned actions are checkpointed **before** they run; resume never
 re-asks the model and never re-executes a completed WRITE; a WRITE whose outcome
-is unknown stops the loop for a human. See
+is unknown stops the loop for a human (or for a confirmer's definite answer). A
+model call whose *input alone* would cross the token budget (or, with `pricing=`
+and `price_model=`, the dollar budget) is refused before it is paid for; the
+output of a call cannot be known in advance, so a call can still overshoot by
+its output. See
 [ADR-0004](adr/0004-durable-loop-and-resume-semantics.md).
 
 ### `keelgate.context`
@@ -145,7 +164,8 @@ is unknown stops the loop for a human. See
 | `WorkingMemory`, `EpisodicMemory`, `SemanticMemory`, `ProceduralMemory` | tiers | Working (per run), episodic (decisions + outcomes), semantic (facts with `valid_from`/`valid_to`, vector search), procedural (versioned skills and playbooks) |
 | `MemoryRecord`, `Attribution` | models | Every write is a **new version** attributed to an agent and a trace id; nothing is edited in place |
 | `SqliteMemoryBackend`, `PostgresMemoryBackend` | backends | Postgres uses pgvector. Bitemporal: `recorded_at` is assigned by the store's clock |
-| `Embedder`, `HashEmbedder` | embedding | `HashEmbedder` is a deterministic **lexical** stand-in for tests; it is not semantic. Supply a real embedder |
+| `Embedder`, `HashEmbedder` | embedding | `HashEmbedder` is a deterministic **lexical** stand-in for tests; it is not semantic |
+| `OllamaEmbedder`, `OpenAICompatibleEmbedder`, `EmbeddingError` | embedding | Real embedding models over `httpx` (Ollama, OpenAI, vLLM and compatible servers). `dim` is required and every response is checked against it; a mismatch is an error, never a truncation |
 
 Guarantees: reads honour `as_of` on both axes (valid time and record time);
 every operation is tenant-scoped; retrieved memory reaches a prompt only as an
@@ -159,7 +179,7 @@ every operation is tenant-scoped; retrieved memory reaches a prompt only as an
 | `LLMRequest`, `LLMResponse`, `Message`, `ToolCall`, `ToolSchema`, `Usage`, `Role`, `FinishReason` | models | A model's reply is a proposal; arguments are untrusted |
 | `PricingTable`, `ModelPrice` | pricing | **No default prices.** An unpriced model has `cost_usd = None` |
 | `LLMError`, `LLMAuthError`, `LLMRateLimitError` | exceptions | `error.retryable` says whether a retry can help |
-| `keelgate.llm.providers.AnthropicClient`, `OpenAIClient`, `GoogleClient`, `OllamaClient`, `VLLMClient` | clients | Optional SDKs are imported lazily. Contract-tested through the real SDKs over a mocked transport; **not tested against live services** |
+| `keelgate.llm.providers.AnthropicClient`, `OpenAIClient`, `GoogleClient`, `OllamaClient`, `VLLMClient` | clients | Optional SDKs are imported lazily. Contract-tested through the real SDKs over a mocked transport. Opt-in live smoke tests exist (`make test-live`) but have **not been run** by the project yet. `LLMRequest.temperature` is deliberately not sent to Anthropic, whose current API has no such parameter |
 
 ### `keelgate.testing`
 
