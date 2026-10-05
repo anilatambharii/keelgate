@@ -241,3 +241,20 @@ test_deny_reasons_are_sorted_and_stable if {
 	rs := reasons(inp)
 	rs == sort(rs)
 }
+
+# ------------------------------------------------------------------ A2A intake
+
+test_allow_a2a_task_intake if {
+	inp := object.union(base, {"action": {"capability": "a2a:task_submit", "side_effect": "PROPOSE"}})
+	effect(json.remove(inp, ["resource"])) == "ALLOW"
+}
+
+test_deny_a2a_task_intake_as_a_write if {
+	inp := object.union(base, {"action": {"capability": "a2a:task_submit", "side_effect": "WRITE"}})
+	effect(json.remove(inp, ["resource"])) == "DENY"
+}
+
+test_deny_a2a_task_intake_in_live_mode if {
+	inp := object.union(with_ctx({"execution_mode": "live"}), {"action": {"capability": "a2a:task_submit", "side_effect": "PROPOSE"}})
+	effect(json.remove(inp, ["resource"])) == "DENY"
+}

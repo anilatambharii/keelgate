@@ -26,6 +26,9 @@ from keelgate.tools import (
 
 T = TypeVar("T")
 
+# Keelgate's own fixtures, loaded here rather than through the pytest11 entry point (see addopts).
+pytest_plugins = ["keelgate.testing.plugin"]
+
 OPA_URL_DEFAULT = os.environ.get("KEELGATE_TEST_OPA_URL", "http://localhost:8181")
 REQUIRE_INTEGRATION = bool(os.environ.get("KEELGATE_REQUIRE_INTEGRATION"))
 

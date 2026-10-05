@@ -98,6 +98,9 @@ class CallContext:
     verifier_flags: tuple[str, ...] = ()
     approval_id: str | None = None
     approval_ttl: timedelta | None = None
+    # Restricts this call to the listed kinds of tool, whatever the grant allows. A
+    # read-only monitor passes {READ}; ``None`` means no extra restriction.
+    allowed_side_effects: frozenset[SideEffect] | None = None
     call_id: str = field(default_factory=lambda: uuid.uuid4().hex)
 
 
@@ -238,6 +241,17 @@ class ToolGateway:
                 message="You are not permitted to use this tool.",
                 hint="Do not retry. Choose a different approach or ask the operator.",
                 log=False,
+            )
+
+        allowed = ctx.allowed_side_effects
+        if allowed is not None and tool.spec.side_effect not in allowed:
+            return self._refuse(
+                st,
+                status=OutcomeStatus.DENIED,
+                code=ErrorCode.SIDE_EFFECT_NOT_PERMITTED,
+                message="This run is not permitted to use that kind of tool.",
+                hint="This run is restricted, for example to read-only tools. Do not retry.",
+                reason=f"{tool.spec.side_effect.value} is outside this run's allowed side effects",
             )
 
         # 3. paper only

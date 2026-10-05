@@ -122,6 +122,32 @@ CASES: list[tuple[str, Mutate, str, str | None, str | None]] = [
         None,
     ),
     ("no-approval-at-threshold", resource(notional=10_000), "ALLOW", None, None),
+    # A2A task intake is a PROPOSE under the same paper-only rule
+    (
+        "a2a-intake",
+        both(action(capability="a2a:task_submit", side_effect="PROPOSE"), drop("resource")),
+        "ALLOW",
+        None,
+        None,
+    ),
+    (
+        "a2a-intake-as-write",
+        both(action(capability="a2a:task_submit", side_effect="WRITE"), drop("resource")),
+        "DENY",
+        None,
+        "not permitted",
+    ),
+    (
+        "a2a-intake-live",
+        both(
+            action(capability="a2a:task_submit", side_effect="PROPOSE"),
+            drop("resource"),
+            context(execution_mode="live"),
+        ),
+        "DENY",
+        None,
+        "live execution is forbidden",
+    ),
     # trading hours
     ("before-open", at("2026-10-05T13:29:00+00:00"), "DENY", None, "outside trading hours"),
     ("at-close", at("2026-10-05T20:00:00+00:00"), "DENY", None, "outside trading hours"),

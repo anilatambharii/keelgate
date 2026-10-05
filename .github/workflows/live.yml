@@ -1,0 +1,34 @@
+name: Live smoke tests
+
+# Manual only. These call real LLM providers and cost money, so they never run on a push or a PR.
+# Add the provider keys you want as repository secrets; a missing key just skips that provider.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  live:
+    name: live providers
+    runs-on: ubuntu-latest
+    env:
+      KEELGATE_LIVE: "1"
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+      KEELGATE_LIVE_OPENAI_MODEL: ${{ vars.KEELGATE_LIVE_OPENAI_MODEL }}
+      KEELGATE_LIVE_GOOGLE_MODEL: ${{ vars.KEELGATE_LIVE_GOOGLE_MODEL }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          python-version: "3.12"
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - run: uv sync --frozen
+
+      - name: Live provider tests
+        run: uv run pytest tests/live -m live --no-cov -rs -p no:cacheprovider

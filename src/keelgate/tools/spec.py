@@ -66,6 +66,10 @@ class ToolSpec:
     cost_estimate: float
     idempotency_key: IdempotencyKeyFn | None
     resource: ResourceFn | None
+    # For tools defined elsewhere (an external MCP server, say) whose schema is not
+    # derived from ``input_model``. Offered to the model as-is; arguments are still
+    # validated by ``input_model``.
+    input_schema: dict[str, Any] | None = None
 
 
 class Tool:
@@ -217,7 +221,7 @@ class ToolRegistry:
             {
                 "name": t.spec.name,
                 "description": t.spec.description,
-                "input_schema": t.spec.input_model.model_json_schema(),
+                "input_schema": t.spec.input_schema or t.spec.input_model.model_json_schema(),
             }
             for t in (self._tools[n] for n in self.names())
         ]

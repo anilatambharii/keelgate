@@ -93,6 +93,31 @@ supplies the policy context (limits, exposure, mode, `as_of`).
 | E6 | Reusing an idempotency key for a different action | Key bound to the argument hash; mismatch refused | `test_reusing_a_key_with_different_arguments_is_refused` | In-memory store (gap G1) |
 | E7 | Prompt injection changing an authorisation outcome | Outcomes are a function of (grant, trusted context, arguments) only | `test_injected_text_cannot_change_the_outcome_of_any_candidate_action` | See "What injection can still do" |
 
+## K2: long-running agents, context, memory and adapters
+
+K2 adds a durable loop, an `as_of` context firewall, layered memory, model
+clients and framework adapters. Each one widens the attack surface, so each has
+its own rows. The earlier STRIDE table still applies unchanged.
+
+| # | Threat | Control | Evidence | Residual risk |
+|---|---|---|---|---|
+| L1 | A crash makes a WRITE run twice | Planned actions are checkpointed *before* they run; resume re-submits the saved arguments; durable idempotency keys | `test_a_crash_at_any_window_resumes_without_a_duplicate_write`, `test_a_killed_process_resumes_in_a_new_process_without_a_duplicate_write` | Exactly-once is a Keelgate-side record; the downstream system must honour the key (ADR-0004) |
+| L2 | The model changes its mind after a restart | Resume never re-plans a saved plan | `test_a_model_that_would_say_something_different_cannot_change_a_saved_action` | none known |
+| L3 | A WRITE dies mid-flight and is blindly retried | The key stays in flight across restarts; reads as *outcome unknown*; the loop stops for a human | `test_a_process_killed_inside_the_tool_body_is_never_retried_by_the_next_one`, `test_a_write_interrupted_mid_flight_stays_unrepeatable_after_a_restart` | Needs a human unless an `OutcomeConfirmer` gives a definite answer; with none configured an unattended agent stalls by design (`test_an_uncertain_or_failing_confirmer_never_settles_anything`) |
+| L4 | A "read-only" loop quietly writes | The loop passes `allowed_side_effects` to the gateway, which refuses PROPOSE and WRITE tools even when the grant allows them | `test_a_verification_loop_cannot_write_even_if_the_model_asks_anyway`, `test_a_monitor_is_read_only_by_default_even_against_a_hostile_script` | none known |
+| L5 | Runaway spend | Token, dollar, iteration and active-time stops; unknown price under a dollar budget stops | `test_an_unpriced_model_under_a_dollar_budget_stops_instead_of_spending_blind`, `test_a_token_budget_stops_before_acting_and_resume_does_not_replan` | A call whose input alone would cross a budget is refused first (`test_a_call_whose_input_alone_would_cross_the_token_budget_is_never_made`); its output cannot be known, so a call can still overshoot by its output |
+| C1 | Future information leaks into a decision | The context builder rejects any item published after `as_of`, and any outside item with no publication time | `test_an_item_published_after_as_of_is_refused`, `test_nothing_published_after_as_of_ever_reaches_the_prompt`, `test_a_tool_result_dated_after_as_of_never_reaches_the_model` | The harness must supply a truthful `published_at`; Keelgate cannot know a source lied |
+| C2 | Outside text escapes into an instruction position | Trust is enforced by type; outside text is fenced and cannot close its own fence | `test_outside_text_can_never_be_marked_trusted`, `test_content_cannot_break_out_of_its_fence` | A model can still *choose* to obey fenced text; the gate, not the fence, is the control |
+| C3 | Compaction launders untrusted text | A summary of untrusted text stays untrusted; summaries carry pointers to the full record and cannot be dated after `as_of` | `test_an_llm_summarizer_cannot_forge_or_omit_pointers`, `test_the_summary_is_never_dated_after_as_of` | none known |
+| M1 | One tenant reads or alters another tenant memory | Every memory operation is tenant-scoped; identical keys in two tenants do not collide | `test_one_tenant_cannot_see_or_change_another_tenants_memory`, `test_search_never_crosses_tenants_however_similar` | Postgres row-level security is not enabled; scoping is in the queries |
+| M2 | A back-dated memory rewrites what was known | Bitemporal and append-only: `recorded_at` comes from the store clock and is clamped | `test_a_retroactive_correction_does_not_rewrite_what_was_known_earlier`, `test_recorded_at_comes_from_the_store_clock_not_the_caller` | none known |
+| M3 | Memory poisoning: stored text steers a later run | Retrieved memory is always an UNTRUSTED context item; every write is attributed (agent, trace id) and audited without content | `test_retrieved_memory_is_always_untrusted_context`, `test_every_write_is_audited_without_its_content` | A poisoned fact still reaches the model, labelled; attribution makes it traceable, not impossible |
+| A1 | An adapter becomes a side door | All adapters call one `GovernedToolset`; the Claude Agent SDK adapter switches off built-in tools and other MCP servers and denies anything ungoverned in `can_use_tool` | `test_the_options_confine_the_agent_to_the_governed_tools`, `test_the_security_relevant_options_cannot_be_overridden` | Verified at the boundary only: the Claude CLI cannot run offline here, so no live agent run was observed |
+| A2 | A malicious external MCP server | Allowlist and capability mapping; optional schema-digest pinning (rug-pull defence); local argument validation; output untrusted | `test_only_allowlisted_tools_are_registered_and_the_rest_are_reported_blocked`, `test_a_pinned_schema_that_still_matches_is_accepted_and_one_that_changed_is_not` | Pinning is opt-in; an unpinned server can change its tools between sessions |
+| A3 | An MCP caller exploits the shared server grant (confused deputy) | Per-request toolsets give each caller its own authority | `test_a_per_request_toolset_gives_each_caller_its_own_authority` | The default shares one grant; deployments must supply per-caller resolution on HTTP |
+| A4 | A remote agent smuggles instructions or work through A2A | Intake is a governed PROPOSE tool (`a2a:task_submit`); remote text is an untrusted fenced item, never the goal; the executor never raises | `test_an_injection_in_the_request_is_passed_as_data_never_as_the_goal`, `test_a_remote_request_reaches_the_loop_only_as_an_untrusted_fenced_item` | A2A transport authentication is the deployment job; the card is unsigned |
+| P1 | Provider clients mis-handle failures or hostile output | Auth failures are never retryable; broken tool-call JSON becomes an invalid-arguments refusal, not a crash; keys are read by the vendor SDK from the environment | `test_http_failures_map_to_keelgate_errors`, `test_broken_tool_arguments_become_empty_not_a_crash` | Not exercised against live services |
+
 ## What prompt injection can still do
 
 Keelgate does not stop a model being talked into *proposing* something. It makes
@@ -125,11 +150,11 @@ Two upstream behaviours were found while building this and are neutralised:
 
 ## Known gaps
 
-These are known, accepted for K1, and listed so nobody assumes otherwise.
+These are known and accepted, and listed so nobody assumes otherwise. G12 onward were added in K2.
 
 | # | Gap | Impact | Planned |
 |---|---|---|---|
-| G1 | Revocations, budgets and idempotency keys are **in-memory** | Wrong across processes or after a restart | Shared durable stores |
+| G1 | The default revocation list, budget ledger and idempotency store are **in-memory**. K2 adds SQLite versions that survive restarts and are safe on one host | Multi-host deployments still need shared (Postgres or Redis) implementations | Shared durable stores |
 | G2 | The audit chain is not **externally anchored** automatically | A party who can rewrite the whole table undetectably forges history | Signed, periodically published heads |
 | G3 | Python cannot hide a function body | Code in the same process that deliberately reaches into `Tool._fn` bypasses the gate | Out-of-process tool execution |
 | G4 | Approvals are SQLite only | No shared approval queue across processes | Postgres backend |
@@ -140,6 +165,13 @@ These are known, accepted for K1, and listed so nobody assumes otherwise.
 | G9 | A timed-out *synchronous* tool keeps running in its thread | Resource use; the effect may still land | Process isolation |
 | G10 | The in-process Rego engine is a different implementation from OPA | Possible divergence | Conformance suite; use OPA in production |
 | G11 | Cedar pack is a subset of `finance_basic` (no trading hours) | Feature gap | Port with precomputed time facts |
+| G12 | The LangGraph checkpoint store is guarded across processes only for `.sqlite(path)` on a file, via a lock file (`test_processes_racing_on_one_sequence_let_exactly_one_win`) | A saver you construct yourself (for example Postgres) is thread-safe only unless you pass `process_lock=` | A Postgres-native compare-and-swap store |
+| G13 | Provider clients are tested through the real SDKs over a mocked transport. Opt-in live smoke tests exist (`make test-live`, a manual workflow) but **have not been run by the project** | Wire-format drift, or a vendor behaviour we did not anticipate, would not be caught until someone runs them | Run them with real keys and record the result |
+| G14 | The Claude Agent SDK adapter is verified at its boundary offline; an opt-in live test exists but **has not been run** | No live agent run has been observed | Run `tests/live` where the Claude CLI and a key are available |
+| G15 | `HashEmbedder` is lexical, not semantic, and is still the default embedder | Semantic recall is poor unless you pass a real one. Real embedders now exist (`OllamaEmbedder`, `OpenAICompatibleEmbedder`, mocked-transport tested, not live-tested) | Make the choice of embedder explicit in deployment config |
+| G16 | The pre-call budget check counts input only (an approximate token count, and the pricing table for dollars); the output of a call is unknowable in advance | A call can overshoot a budget by its output | Cap output with `max_tokens` on the request |
+| G17 | `OUTCOME_UNKNOWN` needs a human unless the deployment supplies an `OutcomeConfirmer` | Unattended agents stall by default. A confirmer is only as trustworthy as the system of record it queries. Its decisions, and human reconciles, are recorded as `loop.reconciled` audit events (actor, source, verdict; never arguments) | A confirmer that is itself attested |
+| G18 | A2A cards are unsigned; transport auth is not provided | Impersonating an agent is possible without deployment-level auth | Signed cards, auth middleware |
 
 ## Secrets
 

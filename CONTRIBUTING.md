@@ -53,6 +53,8 @@ modified, run `git add --renormalize .`.
 | `make policy-test` | `opa check --strict`, `opa fmt --fail` and the Rego unit tests |
 | `make test-integration` | Tests that need `make up`; a missing service **fails**, it does not skip |
 | `make quickstart` | Run the quickstart with the tamper demo |
+| `make test-live` | Opt-in smoke tests against real LLM providers and the Claude Agent SDK (needs keys; costs money) |
+| `make research-loop` | Run the budgeted, resumable loop example (also serves its tools over MCP) |
 | `make hooks` | Run pre-commit over every file |
 | `make docs` | Serve the docs locally |
 

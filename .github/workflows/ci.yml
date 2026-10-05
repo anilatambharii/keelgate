@@ -197,7 +197,7 @@ jobs:
   integration:
     # The tests that need real services. KEELGATE_REQUIRE_INTEGRATION turns a missing
     # service into a failure: a suite that quietly skips these proves nothing.
-    name: integration (Postgres + OPA)
+    name: integration (Postgres + OPA + Temporal)
     runs-on: ubuntu-latest
     env:
       KEELGATE_REQUIRE_INTEGRATION: "1"
@@ -215,10 +215,11 @@ jobs:
       - name: Start Postgres and OPA from the dev stack
         run: docker compose -f docker-compose.dev.yml up -d --wait postgres opa
 
-      - name: Conformance (both Rego engines), Postgres audit, quickstart against real OPA
+      - name: Conformance (both Rego engines), Postgres audit and memory, quickstart, Temporal
         run: >-
           uv run pytest tests/test_policy_conformance.py tests/test_audit.py
-          tests/test_quickstart.py --no-cov -rs -p no:cacheprovider
+          tests/test_quickstart.py tests/test_memory.py tests/test_adapter_temporal.py
+          --no-cov -rs -p no:cacheprovider
 
       - name: Service logs
         if: failure()

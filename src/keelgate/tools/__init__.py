@@ -6,6 +6,7 @@ from keelgate.tools.idempotency import (
     ClaimState,
     IdempotencyStore,
     InMemoryIdempotencyStore,
+    SqliteIdempotencyStore,
 )
 from keelgate.tools.outcomes import (
     ErrorCode,
@@ -38,6 +39,7 @@ __all__ = [
     "OutcomeStatus",
     "RegistryFrozenError",
     "SideEffect",
+    "SqliteIdempotencyStore",
     "Tool",
     "ToolDefinitionError",
     "ToolError",
