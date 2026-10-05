@@ -61,9 +61,10 @@ The reasoning behind each is in the [security model](security-model.md).
 
 ## Project status
 
-!!! warning "Phase K1 — the policy gate"
-    Capabilities, tools, policy, audit and approvals are implemented and tested.
-    The loop, context, memory, telemetry and evals are not built yet. Read the
+!!! warning "Phase K2 — the long-running agent"
+    Capabilities, tools, policy, audit, approvals, the durable loop, context,
+    memory, the LLM client, the framework adapters and the testing kit are
+    implemented and tested. Telemetry and evals are not built yet. Read the
     [known gaps](security-model.md#known-gaps) before relying on it.
 
     Do not point a production workload at this.

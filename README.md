@@ -82,8 +82,11 @@ Optional integrations, installed only if you adapt to them:
 
 ```bash
 pip install "keelgate[langgraph]"   # LangGraph + checkpointers
-pip install "keelgate[openai]"      # OpenAI SDK + Agents SDK
-pip install "keelgate[anthropic]"   # Anthropic SDK + Claude Agent SDK
+pip install "keelgate[openai]"      # OpenAI client + Agents SDK adapter (also vLLM)
+pip install "keelgate[anthropic]"   # Anthropic client + Claude Agent SDK adapter
+pip install "keelgate[google]"      # Gemini client
+pip install "keelgate[mcp]"         # serve governed tools over MCP; govern external MCP tools
+pip install "keelgate[a2a]"         # A2A agent card + task intake under policy
 pip install "keelgate[temporal]"    # Temporal durable-execution adapter
 pip install "keelgate[cedar]"       # Cedar policy engine
 pip install "keelgate[server]"      # FastAPI control surface, Postgres, Redis
@@ -131,6 +134,20 @@ symbol and an oversized order), and one that **requires a human** and then runs
 after approval. It ends by printing the audit chain, verifying it, and (with
 `--tamper`) showing an edited record and a truncated chain being caught.
 
+```bash
+make research-loop                    # or: python examples/research_loop.py
+```
+
+A 3-step agent loop driven by a scripted `FakeLLM` (no keys, no network). It hits a
+**token budget** and stops, is "restarted" (every in-memory object rebuilt over the
+same files), **resumes from its checkpoint** without re-planning, places its paper
+order exactly once, and then **serves the same governed tools over MCP**, where a
+restricted-symbol order is denied by policy.
+
+Testing something built on Keelgate? `keelgate.testing` ships `FakeLLM`, a governed
+test harness and pytest fixtures (`fake_llm`, `governed_harness`, `static_policy`,
+`keelgate_clock`) that load automatically once Keelgate is installed.
+
 ## Safety posture
 
 These are not defaults you can tune away; they are the point of the project.
@@ -146,14 +163,19 @@ policy bypass are in scope and welcome.
 
 ## Project status
 
-**Phase K1 — the policy gate.** The safety core works: signed capability grants,
-a typed tool registry behind a single gateway, an OPA/Rego policy engine with the
-`finance_basic` pack (Cedar optional), a hash-chained audit log, and a
-human-approval queue with a CLI and REST API. Run `make quickstart` to see it.
+**Phase K2 — the long-running agent.** On top of the K1 safety core (signed
+capability grants, a single policy-gated tool gateway, OPA/Rego with the
+`finance_basic` pack, a hash-chained audit log, human approvals) there is now a
+durable, budgeted loop that resumes after a crash without repeating a WRITE;
+an `as_of` context firewall; four-tier bitemporal memory; a model-agnostic LLM
+client (Anthropic, OpenAI, Google, Ollama, vLLM); adapters for LangGraph, the
+OpenAI Agents SDK, the Claude Agent SDK, MCP, A2A and Temporal; and a testing kit.
+Run `make quickstart` and `make research-loop` to see it.
 
-Not built yet: the agent loop, as-of context, memory, telemetry and evals
-([planned](docs/integration-contract.md#planned)). Known limitations are listed
-in the [security model](docs/security-model.md#known-gaps).
+Not built yet: telemetry and evals
+([planned](docs/integration-contract.md#planned)). The provider clients are tested
+through the real vendor SDKs over a mocked transport, not against live services.
+Known limitations are listed in the [security model](docs/security-model.md#known-gaps).
 
 Do not point a production workload at this.
 

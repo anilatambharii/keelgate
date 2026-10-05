@@ -32,6 +32,11 @@ CONTRACT_MODULES = [
     "keelgate.tools",
 ]
 
+# Implementation packages that are not part of the Tycheon contract or an adapter.
+SUBPACKAGES = [
+    "keelgate.llm.providers",
+]
+
 ADAPTER_MODULES = [
     "keelgate.adapters",
     "keelgate.adapters.a2a",
@@ -39,6 +44,7 @@ ADAPTER_MODULES = [
     "keelgate.adapters.langgraph",
     "keelgate.adapters.mcp",
     "keelgate.adapters.openai_agents",
+    "keelgate.adapters.temporal",
 ]
 
 
@@ -52,7 +58,7 @@ def test_contract_module_imports(name: str) -> None:
     assert importlib.import_module(name) is not None
 
 
-@pytest.mark.parametrize("name", ADAPTER_MODULES)
+@pytest.mark.parametrize("name", [*ADAPTER_MODULES, *SUBPACKAGES])
 def test_adapter_module_imports(name: str) -> None:
     assert importlib.import_module(name) is not None
 
@@ -79,7 +85,7 @@ def test_every_package_in_tree_is_declared() -> None:
         for info in pkgutil.walk_packages(keelgate.__path__, prefix="keelgate.")
         if info.ispkg
     }
-    declared = set(CONTRACT_MODULES) | set(ADAPTER_MODULES)
+    declared = set(CONTRACT_MODULES) | set(ADAPTER_MODULES) | set(SUBPACKAGES)
     assert found == declared, (
         f"undeclared packages: {sorted(found - declared)}; "
         f"missing from tree: {sorted(declared - found)}"
