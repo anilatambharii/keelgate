@@ -1,0 +1,18 @@
+# gitleaks configuration. Keeps every default rule and adds one narrow exception.
+
+title = "keelgate gitleaks config"
+
+[extend]
+useDefault = true
+
+# A test sentinel, not a credential. tests/test_context.py plants this string in a
+# future-dated context item to prove that rejected content is never echoed back; the word
+# "SECRET" in it trips the generic-api-key rule. The rule captures the value after the string
+# (here a variable name), so the exception matches the whole line. Both the path and the exact
+# quoted string must match, so this exempts nothing else in that file or anywhere else.
+[[allowlists]]
+description = "Sentinel string in the as_of leakage test"
+condition = "AND"
+paths = ['''^tests/test_context\.py$''']
+regexTarget = "line"
+regexes = ['''"FUTURE-SECRET"''']
