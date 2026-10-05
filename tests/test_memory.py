@@ -555,3 +555,128 @@ def test_semantic_visibility_matches_a_naive_bitemporal_oracle(
         }
         got = {r.content for r in mem.search("fact subject", as_of=as_of, limit=100)}
         assert got == expected, f"as_of=+{day}d expected {sorted(expected)} got {sorted(got)}"
+
+
+# ------------------------------------------------------------ real embedding models (mocked HTTP)
+
+
+def _mock(handler: Any) -> Any:
+    import httpx
+
+    return httpx.Client(transport=httpx.MockTransport(handler))
+
+
+def test_the_ollama_embedder_calls_api_embed_and_returns_vectors() -> None:
+    import httpx
+
+    from keelgate.memory import OllamaEmbedder
+
+    seen: list[Any] = []
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        seen.append(req)
+        return httpx.Response(200, json={"embeddings": [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]})
+
+    e = OllamaEmbedder(model="nomic", dim=3, base_url="http://o:11434/", client=_mock(handler))
+    assert e.embed(["a", "b"]) == [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]
+    assert str(seen[0].url) == "http://o:11434/api/embed" and e.embed([]) == []
+
+
+def test_the_openai_compatible_embedder_orders_by_index_and_sends_the_key() -> None:
+    import httpx
+
+    from keelgate.memory import OpenAICompatibleEmbedder
+
+    seen: list[Any] = []
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        seen.append(req)
+        data = [
+            {"index": 1, "embedding": [0.0, 1.0]},
+            {"index": 0, "embedding": [1.0, 0.0]},
+        ]
+        return httpx.Response(200, json={"data": data})
+
+    e = OpenAICompatibleEmbedder(
+        model="m",
+        dim=2,
+        api_key="k",
+        send_dimensions=True,
+        client=_mock(handler),  # pragma: allowlist secret
+    )
+    assert e.embed(["first", "second"]) == [[1.0, 0.0], [0.0, 1.0]]
+    assert seen[0].headers["authorization"] == "Bearer k"
+    assert b'"dimensions"' in seen[0].content
+    plain = OpenAICompatibleEmbedder(model="m", dim=2, client=_mock(handler))
+    plain.embed(["x", "y"])
+    assert b"dimensions" not in seen[-1].content and "authorization" not in seen[-1].headers
+
+
+@pytest.mark.parametrize(
+    "response",
+    [
+        {"embeddings": [[1.0, 2.0]]},  # wrong dimension
+        {"embeddings": []},  # wrong count
+        {"embeddings": [[1.0, "x", 3.0]]},  # not numbers
+        {"embeddings": [[True, False, True]]},  # bools are not numbers
+        {"nope": 1},  # no embeddings at all
+        [1, 2],  # not an object
+    ],
+)
+def test_a_malformed_embedding_response_is_an_error_never_silently_used(response: Any) -> None:
+    import httpx
+
+    from keelgate.memory import EmbeddingError, OllamaEmbedder
+
+    e = OllamaEmbedder(model="m", dim=3, client=_mock(lambda r: httpx.Response(200, json=response)))
+    with pytest.raises(EmbeddingError):
+        e.embed(["a"])
+
+
+def test_embedding_service_failures_are_embedding_errors() -> None:
+    import httpx
+
+    from keelgate.memory import EmbeddingError, OllamaEmbedder, OpenAICompatibleEmbedder
+
+    down = OllamaEmbedder(model="m", dim=3, client=_mock(lambda r: httpx.Response(503)))
+    with pytest.raises(EmbeddingError, match="HTTP 503"):
+        down.embed(["a"])
+
+    def refuse(req: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("refused", request=req)
+
+    with pytest.raises(EmbeddingError, match="ConnectError"):
+        OllamaEmbedder(model="m", dim=3, client=_mock(refuse)).embed(["a"])
+    bad_json = _mock(lambda r: httpx.Response(200, content=b"not json"))
+    with pytest.raises(EmbeddingError, match="invalid JSON"):
+        OllamaEmbedder(model="m", dim=3, client=bad_json).embed(["a"])
+    with pytest.raises(EmbeddingError, match="no embedding data"):
+        OpenAICompatibleEmbedder(
+            model="m", dim=2, client=_mock(lambda r: httpx.Response(200, json={"data": 5}))
+        ).embed(["a"])
+    with pytest.raises(ValueError, match="positive"):
+        OllamaEmbedder(model="m", dim=0)
+
+
+def test_semantic_memory_retrieves_by_meaning_with_a_real_embedder_not_just_shared_words() -> None:
+    """A stand-in 'model' that knows car~automobile: the lexical embedder cannot do this."""
+
+    class MeaningEmbedder:
+        dim = 2
+
+        def embed(self, texts: Any) -> list[list[float]]:
+            def vehicle(t: str) -> bool:
+                return any(w in t.lower() for w in ("car", "automobile", "vehicle"))
+
+            return [[1.0, 0.0] if vehicle(t) else [0.0, 1.0] for t in texts]
+
+    clock = Clock(T0)
+    memory = SemanticMemory(
+        SqliteMemoryBackend(), tenant_id="t1", clock=clock, embedder=MeaningEmbedder()
+    )
+    who = Attribution(agent_id="a", trace_id="t")
+    start = T0 - timedelta(days=1)
+    memory.assert_fact("autos", "The automobile was recalled.", valid_from=start, attribution=who)
+    memory.assert_fact("bonds", "Bond yields rose.", valid_from=start, attribution=who)
+    hits = memory.search("car", as_of=T0, limit=1)
+    assert [h.content for h in hits] == ["The automobile was recalled."]  # no word in common

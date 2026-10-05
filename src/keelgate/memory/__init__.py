@@ -2,6 +2,7 @@
 
 from keelgate.memory.backends import MemoryBackend, PostgresMemoryBackend, SqliteMemoryBackend
 from keelgate.memory.embedder import Embedder, HashEmbedder, cosine
+from keelgate.memory.http_embedders import EmbeddingError, OllamaEmbedder, OpenAICompatibleEmbedder
 from keelgate.memory.tiers import (
     EpisodicMemory,
     ProceduralMemory,
@@ -23,6 +24,7 @@ __all__ = [
     "Attribution",
     "ConcurrentWriteError",
     "Embedder",
+    "EmbeddingError",
     "EpisodicMemory",
     "HashEmbedder",
     "InvalidMemoryWriteError",
@@ -31,6 +33,8 @@ __all__ = [
     "MemoryRecord",
     "MemoryStoreError",
     "MemoryTier",
+    "OllamaEmbedder",
+    "OpenAICompatibleEmbedder",
     "PostgresMemoryBackend",
     "ProceduralMemory",
     "RecordNotFoundError",
