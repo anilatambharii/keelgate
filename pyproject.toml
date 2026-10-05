@@ -237,12 +237,15 @@ addopts = [
     # The keelgate pytest plugin is loaded from tests/conftest.py instead of its entry point:
     # entry-point plugins import keelgate before coverage starts, which hides its top-level lines.
     "-p", "no:keelgate",
+    # Live tests hit real services and cost money: run them on purpose with `-m live`.
+    "-m", "not live",
     "--cov=keelgate",
     "--cov-report=term-missing",
     "--cov-report=xml",
     "--cov-fail-under=85",
 ]
 markers = [
+    "live: calls real services; needs KEELGATE_LIVE=1 and credentials (run with -m live)",
     "slow: long-running tests, deselect with -m 'not slow'",
     "integration: needs `make up` services (Postgres/Redis/OPA)",
 ]

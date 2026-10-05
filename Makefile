@@ -17,7 +17,7 @@ endif
 
 .PHONY: help setup setup-all lock fmt lint format-check types test check \
         up down restart logs health hooks secrets-baseline docs docs-build \
-        build clean quickstart research-loop
+        build clean quickstart research-loop test-live
 
 help: ## Show this help
 	@awk 'BEGIN{FS=":.*?## "} /^[a-zA-Z_-]+:.*?## /{printf "  \033[36m%-16s\033[0m %s\n",$$1,$$2}' $(MAKEFILE_LIST)
@@ -67,6 +67,9 @@ test-integration: ## Run the tests that need `make up` (fails, not skips, if a s
 
 quickstart: ## Run the quickstart, including the tamper demo
 	$(UV) run python examples/quickstart.py --tamper
+
+test-live: ## Live smoke tests against real LLM providers and the Claude Agent SDK (needs keys; costs money)
+	KEELGATE_LIVE=1 $(UV) run pytest tests/live -m live --no-cov -rs -p no:cacheprovider
 
 research-loop: ## Run the budgeted, resumable loop example (also serves its tools over MCP)
 	$(UV) run python examples/research_loop.py
