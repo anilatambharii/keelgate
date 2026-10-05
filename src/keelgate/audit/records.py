@@ -53,6 +53,8 @@ class EventType(StrEnum):
     TOOL_ERROR = "tool.error"
     TOOL_REPLAY = "tool.replay"
     LOOP_TRANSITION = "loop.transition"
+    MEMORY_WRITE = "memory.write"
+    CONTEXT_REJECTED = "context.rejected"
 
 
 def canonical_json(value: object) -> str:

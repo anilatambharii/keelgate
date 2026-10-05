@@ -29,6 +29,7 @@ from keelgate.capabilities.grants import (
     SignedGrant,
     issue_grant,
 )
+from keelgate.capabilities.stores import SqliteBudgetLedger, SqliteRevocationList
 
 __all__ = [
     "DEFAULT_MAX_TTL",
@@ -52,6 +53,8 @@ __all__ = [
     "InvalidCapabilityError",
     "RevocationList",
     "SignedGrant",
+    "SqliteBudgetLedger",
+    "SqliteRevocationList",
     "UnknownKeyError",
     "issue_grant",
 ]

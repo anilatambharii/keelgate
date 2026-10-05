@@ -37,6 +37,7 @@ class ErrorCode(StrEnum):
     UNKNOWN_TOOL = "unknown_tool"
     INVALID_ARGUMENTS = "invalid_arguments"
     EXECUTION_MODE_FORBIDDEN = "execution_mode_forbidden"
+    SIDE_EFFECT_NOT_PERMITTED = "side_effect_not_permitted"
     BUDGET_EXCEEDED = "budget_exceeded"
     POLICY_DENIED = "policy_denied"
     POLICY_UNAVAILABLE = "policy_unavailable"
