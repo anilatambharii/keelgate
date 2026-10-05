@@ -17,7 +17,7 @@ endif
 
 .PHONY: help setup setup-all lock fmt lint format-check types test check \
         up down restart logs health hooks secrets-baseline docs docs-build \
-        build clean
+        build clean quickstart research-loop
 
 help: ## Show this help
 	@awk 'BEGIN{FS=":.*?## "} /^[a-zA-Z_-]+:.*?## /{printf "  \033[36m%-16s\033[0m %s\n",$$1,$$2}' $(MAKEFILE_LIST)
@@ -63,10 +63,13 @@ policy-test: policy-lint ## Run the Rego unit tests with real OPA
 	$(OPA) test $(OPA_DIR) -v
 
 test-integration: ## Run the tests that need `make up` (fails, not skips, if a service is down)
-	KEELGATE_REQUIRE_INTEGRATION=1 $(UV) run pytest tests/test_policy_conformance.py tests/test_audit.py tests/test_quickstart.py -p no:cacheprovider --no-cov -rs
+	KEELGATE_REQUIRE_INTEGRATION=1 $(UV) run pytest tests/test_policy_conformance.py tests/test_audit.py tests/test_quickstart.py tests/test_memory.py tests/test_adapter_temporal.py -p no:cacheprovider --no-cov -rs
 
 quickstart: ## Run the quickstart, including the tamper demo
 	$(UV) run python examples/quickstart.py --tamper
+
+research-loop: ## Run the budgeted, resumable loop example (also serves its tools over MCP)
+	$(UV) run python examples/research_loop.py
 
 # ---------------------------------------------------------- dev services
 up: ## Start Postgres+pgvector, Redis, OPA and Jaeger, waiting for health
