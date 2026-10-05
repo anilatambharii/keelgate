@@ -55,6 +55,7 @@ class EventType(StrEnum):
     LOOP_TRANSITION = "loop.transition"
     MEMORY_WRITE = "memory.write"
     CONTEXT_REJECTED = "context.rejected"
+    OUTCOME_RECONCILED = "loop.reconciled"
 
 
 def canonical_json(value: object) -> str:

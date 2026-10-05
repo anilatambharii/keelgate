@@ -12,6 +12,7 @@ from keelgate.loop.engine import (
     ContextSource,
     Loop,
     LoopResult,
+    OutcomeConfirmer,
     RunExistsError,
     RunNotFoundError,
 )
@@ -71,6 +72,7 @@ __all__ = [
     "LoopType",
     "MonitorLoop",
     "MonitorSummary",
+    "OutcomeConfirmer",
     "Phase",
     "Plan",
     "PlanRequest",

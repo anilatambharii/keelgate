@@ -8,6 +8,7 @@ without making the loop itself a LangGraph graph, so the core stays free of the 
 
 from __future__ import annotations
 
+import contextlib
 import sqlite3
 import threading
 from typing import TYPE_CHECKING, Any
@@ -19,9 +20,30 @@ from keelgate.loop.checkpoint import StaleCheckpointError
 from keelgate.loop.state import LoopState
 
 if TYPE_CHECKING:
+    from collections.abc import Callable, Iterator
+    from contextlib import AbstractContextManager
     from pathlib import Path
 
     from langgraph.checkpoint.base import BaseCheckpointSaver
+
+
+def _file_lock(path: str) -> Callable[[], AbstractContextManager[None]]:
+    """A cross-process mutex: a SQLite write lock on a dedicated file, released on exit."""
+
+    @contextlib.contextmanager
+    def held() -> Iterator[None]:
+        conn = sqlite3.connect(path, timeout=30.0, isolation_level=None)
+        try:
+            conn.execute("BEGIN IMMEDIATE")
+            try:
+                yield
+            finally:
+                conn.execute("ROLLBACK")
+        finally:
+            conn.close()
+
+    return held
+
 
 _CHANNEL = "loop_state"
 _SEP = "::"
@@ -31,20 +53,29 @@ class LangGraphCheckpointStore:
     """Loop checkpoints on a LangGraph saver.
 
     The stale-writer guard (``save`` refuses a sequence that is not newer) is a read followed by
-    a write, which LangGraph's saver API cannot make atomic. A lock makes it safe between threads
-    of one process. It does NOT protect two processes writing the same run; use
-    :class:`~keelgate.loop.checkpoint.SqliteCheckpointStore`, whose primary key enforces it in
-    the database, where more than one process may drive a run.
+    a write, which LangGraph's saver API cannot make atomic by itself. Two locks make it atomic:
+    a thread lock for threads of one process, and an optional ``process_lock`` for other
+    processes. :meth:`sqlite` on a real file supplies one (a separate ``<path>.lock`` SQLite file
+    held under ``BEGIN IMMEDIATE``). With a saver you build yourself (for example Postgres) and no
+    ``process_lock``, the guard is thread-safe only; pass a lock that suits your backend, or use
+    :class:`~keelgate.loop.checkpoint.SqliteCheckpointStore`.
     """
 
-    def __init__(self, saver: BaseCheckpointSaver[Any]) -> None:
+    def __init__(
+        self,
+        saver: BaseCheckpointSaver[Any],
+        *,
+        process_lock: Callable[[], AbstractContextManager[None]] | None = None,
+    ) -> None:
         self._saver = saver
         self._lock = threading.Lock()
+        self._process_lock = process_lock
 
     @classmethod
     def sqlite(cls, path: str | Path = ":memory:") -> LangGraphCheckpointStore:
         conn = sqlite3.connect(str(path), check_same_thread=False)
-        return cls(SqliteSaver(conn))
+        lock = None if str(path) == ":memory:" else _file_lock(f"{path}.lock")
+        return cls(SqliteSaver(conn), process_lock=lock)
 
     @staticmethod
     def _config(tenant_id: str, run_id: str) -> Any:
@@ -53,7 +84,7 @@ class LangGraphCheckpointStore:
         return {"configurable": {"thread_id": f"{tenant_id}{_SEP}{run_id}", "checkpoint_ns": ""}}
 
     def save(self, state: LoopState) -> None:
-        with self._lock:
+        with self._lock, self._process_lock() if self._process_lock else contextlib.nullcontext():
             self._save(state)
 
     def _save(self, state: LoopState) -> None:

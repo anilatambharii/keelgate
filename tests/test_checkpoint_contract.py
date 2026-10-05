@@ -179,3 +179,33 @@ def test_the_langgraph_store_refuses_a_tenant_id_that_could_alias_another_tenant
     ):
         with pytest.raises(ValueError, match="tenant id"):
             call()
+
+
+def test_processes_racing_on_one_sequence_let_exactly_one_win(tmp_path: Path) -> None:
+    """The LangGraph store is guarded across OS processes, not just threads."""
+    import subprocess
+    import sys
+    import time
+
+    pytest.importorskip("langgraph")
+    db = str(tmp_path / "race.sqlite")
+    start = time.time() + 6.0  # every worker has imported by then, so they collide
+    root = Path(__file__).resolve().parents[1]
+    workers = [
+        subprocess.Popen(  # noqa: S603 - fixed argv
+            [sys.executable, str(root / "tests" / "lg_writer.py"), db, str(start), str(n)],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            cwd=root,
+        )
+        for n in range(5)
+    ]
+    outputs = [w.communicate(timeout=120) for w in workers]
+    assert all(w.returncode == 0 for w in workers), [o[1][-500:] for o in outputs]
+    verdicts = [o[0].split()[0] for o in outputs]
+    assert verdicts.count("WIN") == 1 and verdicts.count("STALE") == 4, verdicts
+    from keelgate.loop.langgraph_store import LangGraphCheckpointStore
+
+    loaded = LangGraphCheckpointStore.sqlite(db).load("t1", "race")
+    assert loaded is not None and loaded.checkpoint_seq == 1

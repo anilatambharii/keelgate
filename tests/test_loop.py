@@ -158,27 +158,53 @@ def test_max_iterations_stops_and_a_larger_limit_resumes(rig: Rig) -> None:
 
 
 def test_a_token_budget_stops_before_acting_and_resume_does_not_replan(rig: Rig) -> None:
-    hundred = Usage(input_tokens=100, output_tokens=0)
+    # The output (which cannot be known in advance) is what crosses the budget here: each call
+    # reports 600 tokens against a 1000-token budget, and the context itself is far smaller.
+    big = Usage(input_tokens=0, output_tokens=600)
     llm = fake(
         [
-            Reply.call("market_quote", symbol="AAPL", usage=hundred),
-            Reply.call("paper_order", usage=hundred, **order("tok-1")),
-            Reply.say("done", usage=hundred),
+            Reply.call("market_quote", symbol="AAPL", usage=big),
+            Reply.call("paper_order", usage=big, **order("tok-1")),
+            Reply.say("done", usage=big),
         ]
     )
-    loop = rig.loop(llm, stop=StopConditions(max_tokens=150))
+    loop = rig.loop(llm, stop=StopConditions(max_tokens=1000))
     stopped = start(loop)
 
     assert stopped.stop_reason is StopReason.TOKEN_BUDGET and stopped.resumable
-    assert stopped.state.tokens_used == 200 and llm.calls_made == 2
+    assert stopped.state.tokens_used == 1200 and llm.calls_made == 2
     assert rig.executions == []  # the plan that crossed the line was saved, not acted on
     assert stopped.state.phase is Phase.ACT
     assert stopped.state.actions[0].status is ActionStatus.PENDING
 
-    done = resume(loop, stop=StopConditions(max_tokens=1000))
+    done = resume(loop, stop=StopConditions(max_tokens=10_000))
     assert done.ok
     assert llm.calls_made == 3  # exactly one more call: the saved plan was NOT regenerated
     assert [e["client_order_id"] for e in rig.executions] == ["tok-1"]
+
+
+def test_a_call_whose_input_alone_would_cross_the_token_budget_is_never_made(rig: Rig) -> None:
+    llm = fake(three_step_script())
+    loop = rig.loop(llm, stop=StopConditions(max_tokens=20))  # smaller than the prompt itself
+    stopped = start(loop)
+
+    assert stopped.stop_reason is StopReason.TOKEN_BUDGET and stopped.resumable
+    assert llm.calls_made == 0 and stopped.state.tokens_used == 0  # nothing was paid for
+    assert stopped.state.iteration == 0  # the attempted step does not count
+
+    done = resume(loop, stop=StopConditions(max_tokens=10_000))
+    assert done.ok and llm.calls_made == 3
+    assert [e["client_order_id"] for e in rig.executions] == ["o-1"]
+
+
+def test_the_pre_call_check_counts_what_was_already_spent(rig: Rig) -> None:
+    # Call 1 fits a 600-token budget and spends 500; the next prompt alone is larger than the
+    # 100 tokens that remain, so the second call is refused before it is paid for.
+    spent = Usage(input_tokens=0, output_tokens=500)
+    llm = fake([Reply.call("market_quote", symbol="AAPL", usage=spent), Reply.say("x")])
+    stopped = start(rig.loop(llm, stop=StopConditions(max_tokens=600)))
+    assert stopped.stop_reason is StopReason.TOKEN_BUDGET
+    assert llm.calls_made == 1 and stopped.state.tokens_used == 500
 
 
 def test_a_dollar_budget_stops_the_loop(rig: Rig) -> None:
@@ -207,6 +233,28 @@ def test_a_priced_model_computes_cost_and_enforces_the_budget(rig: Rig) -> None:
     stopped = start(rig.loop(llm, stop=StopConditions(max_dollars=1.0)))
     assert stopped.stop_reason is StopReason.DOLLAR_BUDGET
     assert not stopped.state.cost_unknown
+
+
+def test_a_dollar_budget_refuses_a_call_whose_input_alone_would_cross_it(rig: Rig) -> None:
+    pricing = PricingTable({"fake-model": ModelPrice(input_per_mtok=1_000_000, output_per_mtok=0)})
+    llm = fake(endless_quotes(), pricing=pricing)  # one dollar per input token
+    loop = rig.loop(
+        llm, stop=StopConditions(max_dollars=5.0), pricing=pricing, price_model="fake-model"
+    )
+    stopped = start(loop)
+    assert stopped.stop_reason is StopReason.DOLLAR_BUDGET
+    assert llm.calls_made == 0 and stopped.state.dollars_used == 0  # refused before any spend
+
+
+def test_the_pre_call_dollar_check_is_skipped_for_an_unpriced_model(rig: Rig) -> None:
+    pricing = PricingTable({})  # no price for any model
+    llm = fake(endless_quotes(), pricing=pricing)
+    loop = rig.loop(
+        llm, stop=StopConditions(max_dollars=5.0), pricing=pricing, price_model="fake-model"
+    )
+    stopped = start(loop)
+    assert stopped.stop_reason is StopReason.COST_UNKNOWN  # the post-call rule still applies
+    assert llm.calls_made == 1
 
 
 def test_no_dollar_budget_means_unknown_cost_is_fine(rig: Rig) -> None:
@@ -721,10 +769,10 @@ def test_resume_of_an_unknown_run_fails(rig: Rig) -> None:
 
 def test_reconcile_only_applies_to_unknown_actions(rig: Rig) -> None:
     # Stop mid-way with a planned action still pending: it is not UNKNOWN, so it cannot be reconciled.
-    hundred = Usage(input_tokens=100, output_tokens=0)
+    big = Usage(input_tokens=0, output_tokens=1200)
     loop = rig.loop(
-        fake([Reply.call("paper_order", usage=hundred, **order("rec-1")), Reply.say("done")]),
-        stop=StopConditions(max_tokens=50),
+        fake([Reply.call("paper_order", usage=big, **order("rec-1")), Reply.say("done")]),
+        stop=StopConditions(max_tokens=1000),
     )
     stopped = start(loop)
     pending = stopped.state.actions[0]

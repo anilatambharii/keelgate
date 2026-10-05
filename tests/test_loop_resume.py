@@ -63,8 +63,8 @@ def restart(rig: Rig, engine: Any) -> Rig:
     )
 
 
-def go(rig: Rig, *, failpoint: Any = None, script: Any = None) -> Any:
-    loop = rig.loop(fake(script or three_step_script()), failpoint=failpoint)
+def go(rig: Rig, *, failpoint: Any = None, script: Any = None, **loop_kwargs: Any) -> Any:
+    loop = rig.loop(fake(script or three_step_script()), failpoint=failpoint, **loop_kwargs)
     return run(
         loop.run_or_resume(
             goal=GOAL, tenant_id=TENANT, agent_id=AGENT, as_of=MARKET_OPEN, run_id="r1"
@@ -218,6 +218,10 @@ def test_a_human_reconciles_an_unknown_write_and_the_loop_finishes_without_repea
 
     result = go(second)
     assert result.ok and len(second.executions) == 1
+    audited = [r for r in second.audit.records(TENANT) if r.event_type == "loop.reconciled"]
+    assert [(r.actor, r.payload["source"], r.payload["executed"]) for r in audited] == [
+        ("alice", "human", True)
+    ]
 
 
 def test_a_human_can_abandon_an_unknown_write_and_the_loop_moves_on(
@@ -296,3 +300,67 @@ def test_any_sequence_of_crashes_still_executes_the_write_exactly_once(
         assert [e["client_order_id"] for e in rig.executions] == ["o-1"]
         assert rig.audit.verify_chain(TENANT).ok
         rig.close()
+
+
+# ------------------------------------------------- an outcome confirmer settles unknowns
+
+
+class Confirmer:
+    name = "orders-ledger"
+
+    def __init__(self, verdict: Any) -> None:
+        self.verdict = verdict
+        self.asked: list[str] = []
+        self.statuses: list[Any] = []
+
+    async def confirm(self, action: Any, state: Any) -> Any:
+        self.asked.append(action.action_id)
+        self.statuses.append(action.status)
+        if isinstance(self.verdict, Exception):
+            raise self.verdict
+        return self.verdict
+
+
+def unknown_after_crash(tmp_path: Path, rego_engine: Any) -> Rig:
+    first = build_rig(tmp_path / "rig", engine=rego_engine)
+    first.crash_in_tool = True
+    with pytest.raises(SimulatedCrash):
+        go(first)
+    return restart(first, rego_engine)
+
+
+def test_a_confirmer_that_says_it_executed_lets_the_loop_finish_without_repeating(
+    tmp_path: Path, rego_engine: Any
+) -> None:
+    rig = unknown_after_crash(tmp_path, rego_engine)
+    confirmer = Confirmer(True)
+    done = go(rig, confirmer=confirmer)
+    assert done.ok and len(confirmer.asked) == 1
+    assert len(rig.executions) == 1  # confirmed as done, never re-run
+    assert confirmer.statuses == [ActionStatus.UNKNOWN]  # it was asked about an unknown action
+    events = [r for r in rig.audit.records(TENANT) if r.event_type == "loop.reconciled"]
+    assert len(events) == 1 and events[0].actor == "orders-ledger"
+    assert events[0].payload["executed"] is True and events[0].payload["source"] == "confirmer"
+    assert "market" not in str(events[0].payload) and "5000" not in str(events[0].payload)
+    assert rig.audit.verify_chain(TENANT).ok
+
+
+def test_a_confirmer_that_says_it_did_not_execute_abandons_the_action_and_moves_on(
+    tmp_path: Path, rego_engine: Any
+) -> None:
+    rig = unknown_after_crash(tmp_path, rego_engine)
+    confirmer = Confirmer(False)
+    done = go(rig, confirmer=confirmer)
+    assert done.ok and len(confirmer.asked) == 1  # the loop moved on and finished
+    assert len(rig.executions) == 1  # abandoned, not retried under the same key
+
+
+@pytest.mark.parametrize("verdict", [None, "yes", 1, RuntimeError("ledger down")])
+def test_an_uncertain_or_failing_confirmer_never_settles_anything(
+    tmp_path: Path, rego_engine: Any, verdict: Any
+) -> None:
+    rig = unknown_after_crash(tmp_path, rego_engine)
+    stopped = go(rig, confirmer=Confirmer(verdict))
+    assert stopped.stop_reason is StopReason.OUTCOME_UNKNOWN
+    assert stopped.state.actions[0].status is ActionStatus.UNKNOWN
+    assert len(rig.executions) == 1

@@ -32,7 +32,8 @@ from keelgate.context import (
     ItemKind,
     Rejection,
 )
-from keelgate.llm.types import LLMError, ToolSchema, Usage
+from keelgate.context.tokens import ApproxTokenCounter
+from keelgate.llm.types import LLMError, Message, ToolSchema, Usage
 from keelgate.loop.roles import (
     AcceptAllVerifier,
     Planner,
@@ -65,6 +66,7 @@ if TYPE_CHECKING:
     from keelgate.audit.log import AuditLog
     from keelgate.context.compaction import Summarizer
     from keelgate.context.tokens import TokenCounter
+    from keelgate.llm.pricing import PricingTable
     from keelgate.loop.checkpoint import CheckpointStore
     from keelgate.memory.tiers import EpisodicMemory
     from keelgate.policy.types import PolicyContext
@@ -93,6 +95,18 @@ class RunExistsError(Exception):
 
 class RunNotFoundError(Exception):
     """``resume`` found no checkpoint for that tenant and run id."""
+
+
+class OutcomeConfirmer(Protocol):
+    """Settles an action whose outcome is unknown by asking the downstream system of record.
+
+    Return ``True`` if the action took effect, ``False`` if it definitely did not, and ``None``
+    when the answer is not certain (the loop then stops for a human, as before).
+    """
+
+    name: str
+
+    async def confirm(self, action: PlannedAction, state: LoopState) -> bool | None: ...
 
 
 class ContextSource(Protocol):
@@ -159,6 +173,9 @@ class Loop:
         context_budget: int = 8000,
         system_prompt: str = DEFAULT_SYSTEM_PROMPT,
         counter: TokenCounter | None = None,
+        pricing: PricingTable | None = None,
+        price_model: str = "",
+        confirmer: OutcomeConfirmer | None = None,
         summarizer: Summarizer | None = None,
         clock: Callable[[], datetime] = _utc_now,
         allowed_side_effects: frozenset[SideEffect] | None = None,
@@ -180,6 +197,9 @@ class Loop:
         self._context_budget = context_budget
         self._system_prompt = system_prompt
         self._counter = counter
+        self._pricing = pricing
+        self._confirmer = confirmer
+        self._price_model = price_model
         self._summarizer = summarizer
         self._clock = clock
         self._allowed = allowed_side_effects
@@ -291,6 +311,7 @@ class Loop:
         )
         run = _Run(state, self._stop, self._clock())
         self._save(run, f"reconcile:{action_id}")
+        self._audit_reconcile(state, action, executed=executed, by=by, source="human")
         return state
 
     # ------------------------------------------------------------------------- driving
@@ -357,6 +378,13 @@ class Loop:
         state = run.state
         state.iteration += 1
         built = await self._build_context(run)
+        tools = self._tool_schemas()
+        # Do not pay for a call whose *input alone* would cross the token or dollar budget. (The
+        # output cannot be known in advance, so a call may still overshoot by its output.)
+        refused = self._precall_stop(run, built.messages, tools)
+        if refused is not None:
+            state.iteration -= 1  # nothing was planned; a resume with more budget retries it
+            return refused
         plan = await self._planner.plan(
             PlanRequest(
                 run_id=state.run_id,
@@ -364,7 +392,7 @@ class Loop:
                 iteration=state.iteration,
                 call_index=state.plan_calls,
                 messages=built.messages,
-                tools=self._tool_schemas(),
+                tools=tools,
             )
         )
         self._account(state, plan.usage)
@@ -396,11 +424,80 @@ class Loop:
         self._failpoint("after_plan")
         return None
 
+    async def _auto_reconcile(self, run: _Run, action: PlannedAction) -> bool:
+        """Ask the harness-supplied confirmer whether an unknown action really happened.
+
+        Only a definite True or False settles it; None, an error, or no confirmer leaves it for a
+        human. The confirmer is trusted harness code that queries the downstream system of
+        record. It is never the model, and never the tool's own claim.
+        """
+        if self._confirmer is None:
+            return False
+        try:
+            verdict = await self._confirmer.confirm(action, run.state)
+        except Exception:
+            return False
+        if not isinstance(verdict, bool):
+            return False
+        action.status = ActionStatus.DONE if verdict else ActionStatus.ABANDONED
+        action.outcome = ActionOutcome(
+            status="reconciled",
+            message=(
+                f"confirmed by {self._confirmer.name}: "
+                f"{'executed' if verdict else 'did not execute'}."
+            ),
+        )
+        self._save(run, f"reconcile:{action.action_id}")
+        self._audit_reconcile(
+            run.state, action, executed=verdict, by=self._confirmer.name, source="confirmer"
+        )
+        return True
+
+    def _audit_reconcile(
+        self, state: LoopState, action: PlannedAction, *, executed: bool, by: str, source: str
+    ) -> None:
+        """Record who settled an unknown outcome, and how, in the audit chain."""
+        if self._audit is None:
+            return
+        self._audit.append(
+            tenant_id=state.tenant_id,
+            event_type=EventType.OUTCOME_RECONCILED,
+            actor=by,
+            payload={
+                "run_id": state.run_id,
+                "trace_id": state.trace_id,
+                "action_id": action.action_id,
+                "tool": action.tool,
+                "executed": executed,
+                "source": source,
+            },
+        )
+
+    def _precall_stop(
+        self, run: _Run, messages: Sequence[Message], tools: Sequence[ToolSchema]
+    ) -> StopReason | None:
+        stop, state = run.stop, run.state
+        if stop.max_tokens is None and stop.max_dollars is None:
+            return None
+        counter = self._counter or ApproxTokenCounter()
+        estimate = sum(counter.count(m.content) for m in messages)
+        estimate += sum(counter.count(t.model_dump_json()) for t in tools)
+        if stop.max_tokens is not None and state.tokens_used + estimate > stop.max_tokens:
+            return StopReason.TOKEN_BUDGET
+        if stop.max_dollars is not None and self._pricing is not None:
+            price = self._pricing.usage(self._price_model, estimate, 0).cost_usd
+            # An unpriced model is handled after the call (COST_UNKNOWN); it is not guessed here.
+            if price is not None and state.dollars_used + price > stop.max_dollars:
+                return StopReason.DOLLAR_BUDGET
+        return None
+
     async def _act(self, run: _Run) -> StopReason | None:  # noqa: PLR0911 - one return per stop
         state = run.state
         for action in state.actions:
             # Special statuses first: UNKNOWN waits for a human, never for a retry.
             if action.status is ActionStatus.UNKNOWN:
+                if await self._auto_reconcile(run, action):
+                    continue
                 return StopReason.OUTCOME_UNKNOWN
             if action.status in SETTLED_ACTIONS:
                 continue
@@ -437,9 +534,12 @@ class Loop:
             after = _status(action)  # _apply_outcome changed it; read it fresh
             if after is ActionStatus.AWAITING_APPROVAL:
                 return StopReason.APPROVAL_PENDING
+            settled_by_confirmer = False
             if after is ActionStatus.UNKNOWN:
-                return StopReason.OUTCOME_UNKNOWN
-            if hard:
+                if not await self._auto_reconcile(run, action):
+                    return StopReason.OUTCOME_UNKNOWN
+                settled_by_confirmer = True
+            if hard and not settled_by_confirmer:
                 state.error = (
                     f"{action.tool}: {action.outcome.error_code if action.outcome else ''}"
                 )
