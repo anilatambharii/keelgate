@@ -1440,6 +1440,7 @@ dev = [
     { name = "google-genai" },
     { name = "httpx2" },
     { name = "hypothesis" },
+    { name = "keelgate-example-metrics" },
     { name = "langgraph" },
     { name = "langgraph-checkpoint-sqlite" },
     { name = "mcp" },
@@ -1498,6 +1499,7 @@ dev = [
     { name = "google-genai", specifier = ">=2.28" },
     { name = "httpx2", specifier = ">=1" },
     { name = "hypothesis", specifier = ">=6.168" },
+    { name = "keelgate-example-metrics", editable = "examples/outcome_metric_plugin" },
     { name = "langgraph", specifier = ">=1.2" },
     { name = "langgraph-checkpoint-sqlite", specifier = ">=3.1" },
     { name = "mcp", specifier = ">=2.3" },
@@ -1516,6 +1518,17 @@ docs = [
     { name = "mkdocs-material", specifier = ">=9.7" },
     { name = "mkdocstrings", extras = ["python"], specifier = ">=1.0" },
 ]
+
+[[package]]
+name = "keelgate-example-metrics"
+version = "0.1.0"
+source = { editable = "examples/outcome_metric_plugin" }
+dependencies = [
+    { name = "keelgate" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "keelgate" }]
 
 [[package]]
 name = "langchain-core"

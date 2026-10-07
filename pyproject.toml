@@ -37,6 +37,7 @@ dependencies = [
 ]
 
 [project.scripts]
+keelgate = "keelgate.cli:main"
 keelgate-approvals = "keelgate.approvals.cli:main"
 
 # Fixtures for downstream projects' tests; loaded by pytest automatically.
@@ -113,6 +114,7 @@ dev = [
     "a2a-sdk>=1.2",
     "temporalio>=1.34",
     "opentelemetry-exporter-otlp-proto-http>=1.45",
+    "keelgate-example-metrics",   # a sample external OutcomeMetric, found via its entry point
     "httpx2>=1",                 # what starlette's TestClient now expects
     "psycopg[binary]>=3.3",      # Postgres audit backend tests
 ]
@@ -120,6 +122,9 @@ docs = [
     "mkdocs-material>=9.7",
     "mkdocstrings[python]>=1.0",
 ]
+
+[tool.uv.sources]
+keelgate-example-metrics = { path = "examples/outcome_metric_plugin", editable = true }
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/keelgate"]

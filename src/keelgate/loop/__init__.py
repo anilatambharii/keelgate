@@ -38,6 +38,7 @@ from keelgate.loop.replay import (
 from keelgate.loop.roles import (
     AcceptAllVerifier,
     CallableVerifier,
+    GroundedAnswerVerifier,
     LLMPlanner,
     LLMVerifier,
     Plan,
@@ -72,6 +73,7 @@ __all__ = [
     "ContextSource",
     "Divergence",
     "GoalPredicate",
+    "GroundedAnswerVerifier",
     "HistoryCheckpointStore",
     "InMemoryCheckpointStore",
     "InProcessRunner",

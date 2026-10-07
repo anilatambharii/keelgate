@@ -10,7 +10,8 @@ from __future__ import annotations
 
 import inspect
 import json
-from collections.abc import Awaitable, Callable
+import re
+from collections.abc import Awaitable, Callable, Iterable
 from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
@@ -159,6 +160,95 @@ class AcceptAllVerifier:
 
     async def verify(self, request: VerifyRequest) -> Verdict:  # noqa: ARG002
         return Verdict.accept("no verification configured")
+
+
+_NUMBER = re.compile(r"(?<![\w.])-?\d{1,3}(?:,\d{3})+(?:\.\d+)?|(?<![\w.])-?\d+(?:\.\d+)?")
+_VERBS = r"(?:bought|sold|purchased|placed|executed|submitted|filled)"
+# A claim that something was done: "I bought", "Bought 5000 of ...", "the order was placed".
+# Deliberately not the bare word "traded": "last traded at 187" describes a market, not an act.
+_CLAIM = re.compile(
+    rf"\b(?:i|we)(?:'ve| have)?\s+(?:just\s+)?{_VERBS}\b"
+    rf"|(?:^|[.!?]\s+){_VERBS}\b"
+    rf"|\b(?:order|trade|purchase)\s+(?:was|has been|is)\s+{_VERBS}\b",
+    re.IGNORECASE | re.MULTILINE,
+)
+_NEGATION = re.compile(r"\b(?:not|never|no|unable|failed|cannot|could not|couldn't|wasn't)\b", re.I)
+_SMALL_INTEGER = 10
+
+
+def _numbers(text: str) -> list[float]:
+    out: list[float] = []
+    for token in _NUMBER.findall(text):
+        try:
+            out.append(float(token.replace(",", "")))
+        except ValueError:
+            continue
+    return out
+
+
+class GroundedAnswerVerifier:
+    """A deterministic verifier: is the final answer supported by what the tools returned?
+
+    Two rules, both cheap and both explainable:
+
+    * **Grounded figures.** Every number in the answer (other than a small whole number such as
+      "3") must appear in the goal or in a tool observation. A fabricated or transposed price
+      has nowhere to come from.
+    * **Honest claims.** If ``write_tools`` is given and the answer says something was bought,
+      sold, placed or executed (and does not say it did *not*), at least one of those tools must
+      have actually completed.
+
+    It cannot judge meaning, so it is a floor under a model-based verifier, not a replacement.
+    It never authorises anything: only the gateway does that.
+    """
+
+    def __init__(self, *, write_tools: Iterable[str] | None = None) -> None:
+        self._write_tools = frozenset(write_tools) if write_tools is not None else None
+
+    async def verify(self, request: VerifyRequest) -> Verdict:
+        answer = request.final_answer
+        if answer is None:
+            return Verdict.accept("no answer to check yet")
+        known = _numbers(request.goal)
+        bodies: list[dict[str, Any]] = []
+        for item in request.observations:
+            known.extend(_numbers(item.content))
+            try:
+                body = json.loads(item.content)
+            except ValueError:
+                continue
+            if isinstance(body, dict):
+                bodies.append(body)
+
+        ungrounded = [
+            n
+            for n in _numbers(answer)
+            if not (float(n).is_integer() and abs(n) <= _SMALL_INTEGER)
+            and not any(abs(n - k) <= 1e-9 * max(1.0, abs(k)) for k in known)
+        ]
+        if ungrounded:
+            return Verdict.reject(
+                "The answer states figures that no tool result supports.",
+                flags=("ungrounded_number",),
+            )
+        if self._write_tools is not None and self._claims_an_effect(answer):
+            done = any(
+                b.get("tool") in self._write_tools and b.get("status") == "done" for b in bodies
+            )
+            if not done:
+                return Verdict.reject(
+                    "The answer claims an action that no tool result shows completed.",
+                    flags=("unsupported_claim",),
+                )
+        return Verdict.accept("figures and claims are supported by the tool results")
+
+    @staticmethod
+    def _claims_an_effect(answer: str) -> bool:
+        for match in _CLAIM.finditer(answer):
+            window = answer[max(0, match.start() - 24) : match.start()]
+            if not _NEGATION.search(window):
+                return True
+        return False
 
 
 VerifierFn = Callable[[VerifyRequest], Verdict | VerdictDecision | bool | Awaitable[Any]]

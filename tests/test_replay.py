@@ -360,3 +360,51 @@ def test_a_langgraph_backed_run_replays_identically(tmp_path: Path, rig: Rig) ->
     go(rig, three_step_script(), checkpoints=store)
     report = run(replay(Recording.from_store(store, TENANT, run_id="r1")))
     assert report.identical, report.divergences
+
+
+# ------------------------------------------------------------------ the CLI
+
+
+def test_cli_replay_by_trace_id(rig: Rig, capsys: pytest.CaptureFixture[str]) -> None:
+    from keelgate import cli
+
+    result = go(rig, three_step_script())
+    rig.checkpoints.close()  # release the file, as a separate process would
+    db = str(rig.root / "checkpoints.sqlite")
+    code = cli.main(
+        ["replay", "--checkpoints", db, "--tenant", TENANT, "--trace-id", result.state.trace_id]
+    )
+    shown = capsys.readouterr().out
+    assert code == 0 and "replays identically" in shown and "3 step(s)" in shown
+
+    code = cli.main(["replay", "--checkpoints", db, "--tenant", TENANT, "--run-id", "r1", "--json"])
+    data = __import__("json").loads(capsys.readouterr().out)
+    assert code == 0 and data["identical"] is True and data["divergences"] == []
+
+
+def test_cli_replay_reports_unknown_runs_and_missing_databases(
+    rig: Rig, capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    from keelgate import cli
+
+    go(rig, three_step_script())
+    rig.checkpoints.close()
+    db = str(rig.root / "checkpoints.sqlite")
+    assert (
+        cli.main(["replay", "--checkpoints", db, "--tenant", TENANT, "--trace-id", "0" * 32]) == 2
+    )
+    assert (
+        cli.main(
+            [
+                "replay",
+                "--checkpoints",
+                str(tmp_path / "none.sqlite"),
+                "--tenant",
+                "t",
+                "--run-id",
+                "r",
+            ]
+        )
+        == 2
+    )
+    assert "no run with trace id" in capsys.readouterr().err
