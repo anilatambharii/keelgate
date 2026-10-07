@@ -1247,7 +1247,7 @@ __version__ = '0.1.0'
 
 ## `keelgate.cli`
 
-The ``keelgate`` command line: ``eval run``, ``eval list`` and ``replay``.
+The ``keelgate`` command line: ``quickstart``, ``eval run``, ``eval list`` and ``replay``.
 
 | Symbol | Kind | Stability | Summary |
 |---|---|---|---|

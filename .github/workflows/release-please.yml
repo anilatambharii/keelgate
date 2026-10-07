@@ -1,0 +1,28 @@
+# Opens (and keeps up to date) a "release" pull request from the Conventional Commits on main.
+# Merging that PR bumps the version, writes CHANGELOG.md, and creates the vX.Y.Z tag and GitHub
+# release. The tag then triggers publish.yml, which uploads to PyPI after a human approves the
+# `pypi` environment.
+#
+# GitHub does not start other workflows for a tag pushed with the default GITHUB_TOKEN, so for the
+# tag to trigger publish.yml automatically, store a fine-grained token (contents and pull requests
+# write) as the repository secret RELEASE_PLEASE_TOKEN. Without it this still works, but after
+# merging the release PR you re-push the tag by hand (see docs/releasing.md).
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: googleapis/release-please-action@v4
+        with:
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json

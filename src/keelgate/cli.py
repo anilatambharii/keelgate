@@ -1,4 +1,4 @@
-"""The ``keelgate`` command line: ``eval run``, ``eval list`` and ``replay``.
+"""The ``keelgate`` command line: ``quickstart``, ``eval run``, ``eval list`` and ``replay``.
 
 Exit codes: 0 everything held, 1 a case failed or a regression was found, 2 bad usage or a
 configuration problem (so CI can tell "the code is worse" from "the job is misconfigured").
@@ -151,6 +151,25 @@ def _list(_: argparse.Namespace) -> int:
     return OK
 
 
+def _quickstart(args: argparse.Namespace) -> int:
+    from keelgate._quickstart import run  # noqa: PLC0415
+
+    return run(["--tamper"] if args.tamper else [])
+
+
+def _migrate(args: argparse.Namespace) -> int:
+    from keelgate._internal.migrate import migrate_paths  # noqa: PLC0415
+
+    missing = [p for p in args.paths if not p.exists()]
+    if missing:
+        sys.stderr.write(f"error: no such path: {missing[0]}\n")
+        return USAGE
+    results, report = migrate_paths(args.paths, write=args.write)
+    sys.stdout.write(report + "\n")
+    manual = sum(len(r.manual) for r in results)
+    return OK if manual == 0 else FAILED
+
+
 def _replay(args: argparse.Namespace) -> int:
     from keelgate.loop import (  # noqa: PLC0415
         NotReplayableError,
@@ -228,6 +247,19 @@ def build_parser() -> argparse.ArgumentParser:
     ev.add_parser("list", help="list suites, cases and discovered metrics").set_defaults(
         handler=_list
     )
+
+    qs = sub.add_parser(
+        "quickstart", help="see ALLOW, DENY and REQUIRE_APPROVAL, then a verified audit chain"
+    )
+    qs.add_argument("--tamper", action="store_true", help="also show tampering being caught")
+    qs.set_defaults(handler=_quickstart)
+
+    mg = sub.add_parser(
+        "migrate-imports", help="rewrite 0.1 deep imports to the 0.2 API (dry run by default)"
+    )
+    mg.add_argument("paths", nargs="+", type=Path)
+    mg.add_argument("--write", action="store_true", help="apply the changes")
+    mg.set_defaults(handler=_migrate)
 
     rp = sub.add_parser("replay", help="rebuild a run from its trace id and replay it")
     rp.add_argument("--checkpoints", required=True, help="path to a SQLite checkpoint database")

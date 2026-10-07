@@ -783,3 +783,16 @@ def test_reconcile_only_applies_to_unknown_actions(rig: Rig) -> None:
         run(loop.reconcile(TENANT, "r1", "r1:99:0", executed=True, by="alice"))
     with pytest.raises(RunNotFoundError):
         run(loop.reconcile(TENANT, "ghost", "x", executed=True, by="alice"))
+
+
+def test_a_checkpoint_written_before_trace_roots_were_recorded_still_loads(rig: Rig) -> None:
+    """0.1 checkpoints have no ``root_span_id``; 0.2 must resume them (docs/migrating-to-0.2.md)."""
+    import json
+
+    from keelgate.loop import LoopState
+
+    result = start(rig.loop(fake(three_step_script())))
+    old = json.loads(result.state.model_dump_json())
+    del old["root_span_id"]  # the field did not exist in 0.1
+    loaded = LoopState.model_validate(old)
+    assert loaded.root_span_id == "" and loaded.run_id == result.state.run_id

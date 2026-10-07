@@ -48,7 +48,9 @@ keelgate = "keelgate.testing.plugin"
 Homepage = "https://github.com/anilatambharii/keelgate"
 Repository = "https://github.com/anilatambharii/keelgate"
 Issues = "https://github.com/anilatambharii/keelgate/issues"
-Documentation = "https://github.com/anilatambharii/keelgate/tree/main/docs"
+Documentation = "https://anilatambharii.github.io/keelgate/"
+Changelog = "https://github.com/anilatambharii/keelgate/blob/main/CHANGELOG.md"
+"Security policy" = "https://github.com/anilatambharii/keelgate/blob/main/SECURITY.md"
 
 # Optional integrations. Keelgate wraps these frameworks; it never requires them.
 # Install only what you adapt to, e.g. `pip install "keelgate[langgraph]"`.
@@ -182,6 +184,8 @@ ignore = [
 # The _check_write / _embedding_for / _record_id_for hooks share one signature across all four
 # tiers; each tier uses only the arguments it needs.
 "src/keelgate/memory/_tiers.py" = ["ARG002"]
+# The quickstart is a console demo: printing is its output.
+"src/keelgate/_quickstart.py" = ["T20", "PLR0915", "PLR0912"]
 # Tests and the demo are not shipped, and deliberately do things library code must not:
 # assert, poke privates, hold dummy secrets, import locally to mutate the gateway.
 "tests/**" = [
