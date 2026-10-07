@@ -1,0 +1,101 @@
+name: Evals (nightly, real models)
+
+# Runs the eval and red-team suites against REAL models. It costs money and needs provider keys,
+# so it never runs on a pull request. A provider whose key is not set is skipped, not failed.
+#
+# Live results vary from run to run, so the baselines allow a tolerance (--tolerance) and the one
+# thing that never has slack is the red-team verdict: if any case is not blocked, the job fails.
+# Run it once by hand with "update_baseline" ticked to record the first baseline per provider;
+# until then regressions are not checked (the report says so) but red-team failures still fail.
+on:
+  schedule:
+    - cron: "23 3 * * *"
+  workflow_dispatch:
+    inputs:
+      update_baseline:
+        description: "Record this run as the baseline (only from a run with no failures)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  live:
+    name: ${{ matrix.provider }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - provider: anthropic
+            key: ANTHROPIC_API_KEY
+            model_var: EVAL_MODEL_ANTHROPIC
+            default_model: claude-haiku-4-5-20251001
+          - provider: openai
+            key: OPENAI_API_KEY
+            model_var: EVAL_MODEL_OPENAI
+            default_model: ""
+          - provider: google
+            key: GOOGLE_API_KEY
+            model_var: EVAL_MODEL_GOOGLE
+            default_model: ""
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+      EVAL_MODEL_ANTHROPIC: ${{ vars.EVAL_MODEL_ANTHROPIC }}
+      EVAL_MODEL_OPENAI: ${{ vars.EVAL_MODEL_OPENAI }}
+      EVAL_MODEL_GOOGLE: ${{ vars.EVAL_MODEL_GOOGLE }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Decide whether this provider can run
+        id: plan
+        run: |
+          key="${{ matrix.key }}"
+          model_var="${{ matrix.model_var }}"
+          model="${!model_var:-${{ matrix.default_model }}}"
+          if [ -z "${!key}" ]; then
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::${{ matrix.provider }}: no ${{ matrix.key }} secret, skipping"
+          elif [ -z "$model" ]; then
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::${{ matrix.provider }}: set the repository variable ${{ matrix.model_var }}"
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            echo "model=$model" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: astral-sh/setup-uv@v10.2.0
+        if: steps.plan.outputs.run == 'true'
+        with:
+          python-version: "3.12"
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - if: steps.plan.outputs.run == 'true'
+        run: uv sync --frozen
+
+      - name: Run the live evals
+        if: steps.plan.outputs.run == 'true'
+        run: >-
+          uv run keelgate eval run
+          --mode live --provider ${{ matrix.provider }} --model "${{ steps.plan.outputs.model }}"
+          --suite unit,trajectory,redteam
+          --out eval-report --format json,html,md
+          --baseline evals/baseline-live-${{ matrix.provider }}.json
+          --tolerance 0.15
+          ${{ inputs.update_baseline && '--update-baseline' || '' }}
+
+      - name: Job summary
+        if: always() && steps.plan.outputs.run == 'true'
+        run: cat eval-report/report.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the report
+        if: always() && steps.plan.outputs.run == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: eval-report-${{ matrix.provider }}
+          path: eval-report/
+          retention-days: 30
