@@ -2,6 +2,7 @@
 
 from keelgate.loop.checkpoint import (
     CheckpointStore,
+    HistoryCheckpointStore,
     InMemoryCheckpointStore,
     SqliteCheckpointStore,
     StaleCheckpointError,
@@ -23,9 +24,21 @@ from keelgate.loop.kinds import (
     Schedule,
     VerificationLoop,
 )
+from keelgate.loop.replay import (
+    Divergence,
+    NotReplayableError,
+    RecordedAction,
+    RecordedStep,
+    Recording,
+    ReplayReport,
+    diff,
+    find_run,
+    replay,
+)
 from keelgate.loop.roles import (
     AcceptAllVerifier,
     CallableVerifier,
+    GroundedAnswerVerifier,
     LLMPlanner,
     LLMVerifier,
     Plan,
@@ -58,7 +71,10 @@ __all__ = [
     "CallableVerifier",
     "CheckpointStore",
     "ContextSource",
+    "Divergence",
     "GoalPredicate",
+    "GroundedAnswerVerifier",
+    "HistoryCheckpointStore",
     "InMemoryCheckpointStore",
     "InProcessRunner",
     "LLMPlanner",
@@ -72,6 +88,7 @@ __all__ = [
     "LoopType",
     "MonitorLoop",
     "MonitorSummary",
+    "NotReplayableError",
     "OutcomeConfirmer",
     "Phase",
     "Plan",
@@ -79,6 +96,10 @@ __all__ = [
     "PlannedAction",
     "Planner",
     "ProposedAction",
+    "RecordedAction",
+    "RecordedStep",
+    "Recording",
+    "ReplayReport",
     "RunExistsError",
     "RunNotFoundError",
     "Schedule",
@@ -92,4 +113,7 @@ __all__ = [
     "Verifier",
     "VerifyRequest",
     "default_checkpointer",
+    "diff",
+    "find_run",
+    "replay",
 ]

@@ -12,8 +12,13 @@ useDefault = true
 # A test sentinel, not a credential. tests/test_context.py plants "FUTURE-SECRET" in a
 # future-dated context item to prove that rejected content is never echoed back; the word
 # "SECRET" in it trips the generic-api-key rule. That rule captures the value after the string
-# (here a variable name), so the exception matches the whole line. Only a line containing this
-# exact quoted string is exempt.
+# (here a variable name), so the exception matches the whole line. Only a line containing one of
+# the exact strings below is exempt.
 description = "Sentinel string in the as_of leakage test"
 regexTarget = "line"
-regexes = ['''"FUTURE-SECRET"''']
+regexes = [
+    '''"FUTURE-SECRET"''',
+    # A made-up AWS-style key: the test vector for the span redactor in tests/test_telemetry.py.
+    # It has to look like a real key for the redaction pattern to be tested at all.
+    '''AKIAABCDEFGHIJKLMNOP''',  # pragma: allowlist secret
+]

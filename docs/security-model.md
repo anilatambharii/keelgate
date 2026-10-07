@@ -118,6 +118,24 @@ its own rows. The earlier STRIDE table still applies unchanged.
 | A4 | A remote agent smuggles instructions or work through A2A | Intake is a governed PROPOSE tool (`a2a:task_submit`); remote text is an untrusted fenced item, never the goal; the executor never raises | `test_an_injection_in_the_request_is_passed_as_data_never_as_the_goal`, `test_a_remote_request_reaches_the_loop_only_as_an_untrusted_fenced_item` | A2A transport authentication is the deployment job; the card is unsigned |
 | P1 | Provider clients mis-handle failures or hostile output | Auth failures are never retryable; broken tool-call JSON becomes an invalid-arguments refusal, not a crash; keys are read by the vendor SDK from the environment | `test_http_failures_map_to_keelgate_errors`, `test_broken_tool_arguments_become_empty_not_a_crash` | Not exercised against live services |
 
+## K3: telemetry, replay and evals
+
+Observability code sees everything, so it is a leak surface of its own. These rows cover it.
+
+| # | Threat | Control | Evidence | Residual risk |
+|---|---|---|---|---|
+| O1 | Spans leak tool arguments, outputs or prompts to a third-party backend | Spans carry identifiers, verdicts, counts and an argument hash only; prompts and responses are recorded only under an explicit opt-in | `test_no_span_carries_arguments_tool_output_or_model_text`, `test_prompts_and_responses_are_not_recorded_by_default` | Application spans created outside Keelgate are the application's responsibility |
+| O2 | Exception text carries sensitive input into a trace | Only the exception type is recorded; the message and stack are never attached | `test_a_failing_call_marks_the_span_with_the_error_type_only`, `test_a_failing_memory_operation_records_the_error_type_only` | Backends may add their own exception capture |
+| O3 | PII reaches the exporter when content capture is on | `RedactingSpanProcessor` hands the exporter a redacted copy (emails, Luhn-valid card numbers, SSNs, phones, IBANs, keys, JWTs, bearer tokens) | `test_pii_patterns_are_redacted`, `test_redaction_covers_attributes_events_and_names_without_touching_the_original` | Pattern matching misses names and free-text addresses: keep content capture off in production |
+| O4 | One tenant's spend or activity is attributed to another | Cost and span attribution come from the run bound by the loop, never from model output | `test_cost_is_tracked_per_tenant_and_agent`, `test_every_span_in_a_run_is_attributed_to_its_tenant_and_agent` | A caller that bypasses the loop must bind a run itself |
+| O5 | A trace id used to read another tenant's run | Lookup by trace id is scoped to one tenant | `test_an_unknown_trace_id_and_another_tenants_run_are_not_found` | none known |
+| R1 | Replay re-executes a side effect | Replay substitutes the gateway with recorded outcomes; it holds no grant and no tools | `test_a_replay_is_identical_and_executes_nothing` | none known |
+| R2 | Replay guesses at a result that was never recorded | Runs awaiting approval, with an unknown outcome or an unrun plan are refused | `test_a_run_waiting_for_approval_has_no_result_to_replay`, `test_a_run_with_an_unknown_outcome_is_not_replayable` | Replay does not re-evaluate policy under today's rules |
+| E1 | The red-team suite passes because it can no longer fail | Mutation tests remove each defence and require the matching cases to fail; a case whose attack never reached the gate fails | `test_removing_the_policy_gate_makes_policy_dependent_attacks_succeed`, `test_every_category_has_a_case_that_can_fail`, `test_a_vacuous_attack_that_never_reaches_the_gate_fails` | The cases are hand-written: they cover what was thought of |
+| E2 | A regression slips through because a failing case was deleted | A baseline case that no longer runs counts as a regression | `test_a_previously_passing_case_that_now_fails_or_vanishes_is_a_regression` | none known |
+| E3 | A hostile outcome-metric plugin | Plugins load defensively and report only error types; they still run in-process with full authority | `test_a_broken_plugin_is_reported_without_stopping_the_others` | Install only plugins you trust |
+| E4 | A restricted-symbol list bypassed with a look-alike character | The tool validates tickers as ASCII at the schema level; use an allowlist | `test_removing_the_policy_gate_makes_policy_dependent_attacks_succeed` (TI-06 runs in every red-team pass) | An exact-match denylist alone is bypassable: a production tool must validate its own inputs |
+
 ## What prompt injection can still do
 
 Keelgate does not stop a model being talked into *proposing* something. It makes
@@ -172,6 +190,11 @@ These are known and accepted, and listed so nobody assumes otherwise. G12 onward
 | G16 | The pre-call budget check counts input only (an approximate token count, and the pricing table for dollars); the output of a call is unknowable in advance | A call can overshoot a budget by its output | Cap output with `max_tokens` on the request |
 | G17 | `OUTCOME_UNKNOWN` needs a human unless the deployment supplies an `OutcomeConfirmer` | Unattended agents stall by default. A confirmer is only as trustworthy as the system of record it queries. Its decisions, and human reconciles, are recorded as `loop.reconciled` audit events (actor, source, verdict; never arguments) | A confirmer that is itself attested |
 | G18 | A2A cards are unsigned; transport auth is not provided | Impersonating an agent is possible without deployment-level auth | Signed cards, auth middleware |
+| G19 | Redaction is pattern-based | Names, free-text addresses and unusual identifiers are not caught | Keep content capture off; add deployment-specific patterns |
+| G20 | OTLP export is HTTP only and unauthenticated unless you pass headers or an https endpoint | Spans (identifiers and hashes) could be read or injected in transit on an open network | Use https and an auth header |
+| G21 | Replay does not re-ask a model or re-evaluate policy | It cannot say whether a new model or today's policy would decide differently | Use the evals; a policy-replay mode |
+| G22 | The red-team suite is 36 hand-written cases | It proves those attacks are blocked, not that no attack works | A fuzzing or generative layer |
+| G23 | Live evals, Phoenix export and OTLP/gRPC have not been exercised | The nightly workflow and Phoenix path are written but unrun; gRPC is not supported | Run the nightly workflow with keys; verify Phoenix |
 
 ## Secrets
 

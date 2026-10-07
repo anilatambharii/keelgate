@@ -28,6 +28,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Final
 
+from opentelemetry.trace import Status, StatusCode
 from pydantic import BaseModel, ValidationError
 
 from keelgate.approvals import (
@@ -56,6 +57,8 @@ from keelgate.policy import (
     PolicyInput,
 )
 from keelgate.policy.engine import deny as policy_deny
+from keelgate.telemetry import attributes as attr
+from keelgate.telemetry.core import set_attributes, span
 from keelgate.tools.idempotency import (
     ClaimState,
     IdempotencyStore,
@@ -159,6 +162,47 @@ class ToolGateway:
     ) -> ToolOutcome:
         """Run one proposed tool call through every gate. Never raises for a refusal."""
         state = _State(ctx=context, tool_name=tool_name)
+        # The span carries identifiers, the verdict and a hash of the arguments. Never the
+        # arguments or the output: both are untrusted and may be sensitive.
+        with span(
+            f"{attr.OP_EXECUTE_TOOL} {tool_name[:80]}",
+            attributes={
+                attr.GEN_AI_OPERATION_NAME: attr.OP_EXECUTE_TOOL,
+                attr.GEN_AI_TOOL_NAME: tool_name,
+                attr.GEN_AI_TOOL_CALL_ID: context.call_id,
+                attr.GEN_AI_TOOL_TYPE: "function",
+                attr.TENANT_ID: context.tenant_id,
+            },
+        ) as current:
+            outcome = await self._run(state, arguments, grant_token)
+            self._annotate(current, state, outcome)
+            return outcome
+
+    def _annotate(self, current: Any, st: _State, outcome: ToolOutcome) -> None:
+        policy = outcome.policy or st.policy
+        set_attributes(
+            current,
+            {
+                attr.TOOL_STATUS: outcome.status.value,
+                attr.TOOL_ERROR_CODE: outcome.error.code.value if outcome.error else None,
+                attr.TOOL_REPLAYED: outcome.replayed or None,
+                attr.ARGS_HASH: st.args_hash or None,
+                attr.AGENT_ID: st.grant.agent_id if st.grant else None,
+                attr.TOOL_SIDE_EFFECT: st.tool.spec.side_effect.value if st.tool else None,
+                attr.TOOL_CAPABILITY: str(st.tool.spec.capability) if st.tool else None,
+                attr.POLICY_EFFECT: policy.effect.value if policy else None,
+                attr.APPROVAL_ID: outcome.approval_id,
+                attr.APPROVAL_TIER: outcome.approval_tier.value if outcome.approval_tier else None,
+            },
+        )
+        if outcome.status is OutcomeStatus.ERROR:
+            current.set_status(
+                Status(StatusCode.ERROR, outcome.error.code.value if outcome.error else "error")
+            )
+
+    async def _run(
+        self, state: _State, arguments: Mapping[str, Any], grant_token: str
+    ) -> ToolOutcome:
         try:
             refusal = await self._gate(state, arguments, grant_token)
         except AuditError:
@@ -481,9 +525,31 @@ class ToolGateway:
                 resource=resource,
                 context=st.ctx.policy_context,
             )
-            decision = await self._engine.decide(policy_input)
-            if not isinstance(decision, PolicyDecision):
-                raise TypeError("engine returned a non-decision")
+            with span(
+                "keelgate.policy.decide",
+                attributes={
+                    attr.POLICY_ENGINE: getattr(self._engine, "name", "unknown"),
+                    attr.GEN_AI_TOOL_NAME: tool.name,
+                    attr.TOOL_SIDE_EFFECT: tool.spec.side_effect.value,
+                    attr.TOOL_CAPABILITY: str(tool.spec.capability),
+                    attr.TENANT_ID: grant.tenant_id,
+                    attr.AGENT_ID: grant.agent_id,
+                },
+            ) as decided:
+                decision = await self._engine.decide(policy_input)
+                if not isinstance(decision, PolicyDecision):
+                    raise TypeError("engine returned a non-decision")
+                set_attributes(
+                    decided,
+                    {
+                        attr.POLICY_EFFECT: decision.effect.value,
+                        attr.POLICY_VERSION: decision.policy_version,
+                        attr.POLICY_REASONS: "; ".join(decision.reasons) or None,
+                        attr.APPROVAL_TIER: (
+                            decision.approval_tier.value if decision.approval_tier else None
+                        ),
+                    },
+                )
             return decision
         except Exception as exc:  # the gate fails closed on any engine or input error
             return policy_deny(

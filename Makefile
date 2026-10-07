@@ -17,7 +17,7 @@ endif
 
 .PHONY: help setup setup-all lock fmt lint format-check types test check \
         up down restart logs health hooks secrets-baseline docs docs-build \
-        build clean quickstart research-loop test-live
+        build clean quickstart research-loop test-live eval
 
 help: ## Show this help
 	@awk 'BEGIN{FS=":.*?## "} /^[a-zA-Z_-]+:.*?## /{printf "  \033[36m%-16s\033[0m %s\n",$$1,$$2}' $(MAKEFILE_LIST)
@@ -63,10 +63,13 @@ policy-test: policy-lint ## Run the Rego unit tests with real OPA
 	$(OPA) test $(OPA_DIR) -v
 
 test-integration: ## Run the tests that need `make up` (fails, not skips, if a service is down)
-	KEELGATE_REQUIRE_INTEGRATION=1 $(UV) run pytest tests/test_policy_conformance.py tests/test_audit.py tests/test_quickstart.py tests/test_memory.py tests/test_adapter_temporal.py -p no:cacheprovider --no-cov -rs
+	KEELGATE_REQUIRE_INTEGRATION=1 $(UV) run pytest tests/test_policy_conformance.py tests/test_audit.py tests/test_quickstart.py tests/test_memory.py tests/test_adapter_temporal.py tests/test_jaeger_integration.py -p no:cacheprovider --no-cov -rs
 
 quickstart: ## Run the quickstart, including the tamper demo
 	$(UV) run python examples/quickstart.py --tamper
+
+eval: ## Run every eval and red-team suite with the scripted model; fails on any miss or regression
+	$(UV) run keelgate eval run --out eval-report --format json,html,md --baseline evals/baseline.json
 
 test-live: ## Live smoke tests against real LLM providers and the Claude Agent SDK (needs keys; costs money)
 	KEELGATE_LIVE=1 $(UV) run pytest tests/live -m live --no-cov -rs -p no:cacheprovider

@@ -61,10 +61,10 @@ The reasoning behind each is in the [security model](security-model.md).
 
 ## Project status
 
-!!! warning "Phase K2 — the long-running agent"
+!!! warning "Phase K3 — traceable, replayable, testable"
     Capabilities, tools, policy, audit, approvals, the durable loop, context,
-    memory, the LLM client, the framework adapters and the testing kit are
-    implemented and tested. Telemetry and evals are not built yet. Read the
+    memory, the LLM client, the framework adapters, the testing kit, telemetry,
+    replay and the eval and red-team suites are implemented and tested. Read the
     [known gaps](security-model.md#known-gaps) before relying on it.
 
     Do not point a production workload at this.

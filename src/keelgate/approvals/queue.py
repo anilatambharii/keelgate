@@ -32,6 +32,8 @@ from keelgate.approvals.models import (
 )
 from keelgate.approvals.tiers import ApprovalTier
 from keelgate.audit import AuditLog, EventType
+from keelgate.telemetry import attributes as attr
+from keelgate.telemetry.hooks import traced
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -112,6 +114,16 @@ class ApprovalQueue:
 
     # ------------------------------------------------------------- submission
 
+    @traced(
+        "keelgate.approval.submit",
+        pre=lambda a: {
+            attr.TENANT_ID: a["tenant_id"],
+            attr.APPROVAL_TIER: a["tier"].value,
+            attr.GEN_AI_TOOL_NAME: a["tool_name"],
+            attr.AGENT_ID: a["agent_id"],
+        },
+        post=lambda r: {attr.APPROVAL_ID: r.request_id, attr.APPROVAL_STATUS: r.status.value},
+    )
     def submit(
         self,
         *,
@@ -185,6 +197,11 @@ class ApprovalQueue:
 
     # -------------------------------------------------------------- decisions
 
+    @traced(
+        "keelgate.approval.approve",
+        pre=lambda a: {attr.TENANT_ID: a["tenant_id"], attr.APPROVAL_ID: a["request_id"]},
+        post=lambda r: {attr.APPROVAL_STATUS: r.status.value, attr.APPROVAL_TIER: r.tier.value},
+    )
     def approve(
         self,
         tenant_id: str,
@@ -203,6 +220,11 @@ class ApprovalQueue:
                 raise ApprovalSignoffError("EXPLICIT_SIGNOFF needs the evidence signoff code")
             return self._decide(request, ApprovalStatus.APPROVED, approver, note)
 
+    @traced(
+        "keelgate.approval.reject",
+        pre=lambda a: {attr.TENANT_ID: a["tenant_id"], attr.APPROVAL_ID: a["request_id"]},
+        post=lambda r: {attr.APPROVAL_STATUS: r.status.value, attr.APPROVAL_TIER: r.tier.value},
+    )
     def reject(
         self,
         tenant_id: str,
@@ -217,6 +239,15 @@ class ApprovalQueue:
 
     # ------------------------------------------------------------ consumption
 
+    @traced(
+        "keelgate.approval.consume",
+        pre=lambda a: {
+            attr.TENANT_ID: a["tenant_id"],
+            attr.APPROVAL_ID: a["request_id"],
+            attr.GEN_AI_TOOL_NAME: a["tool_name"],
+        },
+        post=lambda r: {attr.APPROVAL_STATUS: r.status.value},
+    )
     def consume(
         self,
         *,

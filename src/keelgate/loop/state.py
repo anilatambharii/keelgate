@@ -121,6 +121,8 @@ class LoopState(BaseModel):
     tenant_id: str
     agent_id: str
     trace_id: str
+    # The span id of this run's first root span; resumed runs parent on it, so one run is one trace.
+    root_span_id: str = ""
     loop_type: LoopType = LoopType.TASK
     goal: str
     as_of: datetime

@@ -194,10 +194,43 @@ jobs:
       - name: Unit tests
         run: opa test policies -v
 
+  evals:
+    # Scripted-model evals on every PR: unit, trajectory, red-team and outcome suites, compared
+    # against the committed baseline. Any red-team case that is not blocked, and any case or
+    # metric that got worse than evals/baseline.json, fails the build.
+    name: evals (scripted model)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          python-version: "3.12"
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - run: uv sync --frozen
+
+      - name: Run evals and red-team suites
+        run: uv run keelgate eval run --out eval-report --format json,html,md --baseline evals/baseline.json
+
+      - name: Job summary
+        if: always()
+        run: cat eval-report/report.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: eval-report
+          path: eval-report/
+          if-no-files-found: warn
+          retention-days: 14
+
   integration:
     # The tests that need real services. KEELGATE_REQUIRE_INTEGRATION turns a missing
     # service into a failure: a suite that quietly skips these proves nothing.
-    name: integration (Postgres + OPA + Temporal)
+    name: integration (Postgres + OPA + Temporal + Jaeger)
     runs-on: ubuntu-latest
     env:
       KEELGATE_REQUIRE_INTEGRATION: "1"
@@ -213,13 +246,13 @@ jobs:
       - run: uv sync --frozen
 
       - name: Start Postgres and OPA from the dev stack
-        run: docker compose -f docker-compose.dev.yml up -d --wait postgres opa
+        run: docker compose -f docker-compose.dev.yml up -d --wait postgres opa jaeger
 
       - name: Conformance (both Rego engines), Postgres audit and memory, quickstart, Temporal
         run: >-
           uv run pytest tests/test_policy_conformance.py tests/test_audit.py
           tests/test_quickstart.py tests/test_memory.py tests/test_adapter_temporal.py
-          --no-cov -rs -p no:cacheprovider
+          tests/test_jaeger_integration.py --no-cov -rs -p no:cacheprovider
 
       - name: Service logs
         if: failure()

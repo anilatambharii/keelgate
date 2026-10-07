@@ -1,0 +1,102 @@
+{
+  "cases": {
+    "outcome": [
+      "accuracy",
+      "brier_score",
+      "expected_calibration_error"
+    ],
+    "redteam": [
+      "AL-01",
+      "AL-02",
+      "AL-03",
+      "AL-04",
+      "AL-05",
+      "AL-06",
+      "AL-07",
+      "CE-01",
+      "CE-02",
+      "CE-03",
+      "CE-04",
+      "CE-05",
+      "CE-06",
+      "CE-07",
+      "CE-08",
+      "CE-09",
+      "CE-10",
+      "CE-11",
+      "DI-01",
+      "DI-02",
+      "DI-03",
+      "DI-04",
+      "MP-01",
+      "MP-02",
+      "MP-03",
+      "MP-04",
+      "MP-05",
+      "MP-06",
+      "MP-07",
+      "TI-01",
+      "TI-02",
+      "TI-03",
+      "TI-04",
+      "TI-05",
+      "TI-06",
+      "TI-07"
+    ],
+    "trajectory": [
+      "T-C1",
+      "T-C2",
+      "T-C3",
+      "T-F1",
+      "T-F2",
+      "T-F3",
+      "T-F4",
+      "T-F5"
+    ],
+    "unit": [
+      "U-01",
+      "U-02",
+      "U-03",
+      "U-04",
+      "U-05",
+      "U-06",
+      "U-07"
+    ]
+  },
+  "metrics": {
+    "accuracy": {
+      "higher_is_better": true,
+      "value": 0.75
+    },
+    "argument_match_rate": {
+      "higher_is_better": true,
+      "value": 1.0
+    },
+    "argument_validity_rate": {
+      "higher_is_better": true,
+      "value": 1.0
+    },
+    "brier_score": {
+      "higher_is_better": false,
+      "value": 0.1615
+    },
+    "clean_false_positive_rate": {
+      "higher_is_better": false,
+      "value": 0.0
+    },
+    "expected_calibration_error": {
+      "higher_is_better": false,
+      "value": 0.26000000000000006
+    },
+    "seeded_fault_catch_rate": {
+      "higher_is_better": true,
+      "value": 1.0
+    },
+    "tool_choice_accuracy": {
+      "higher_is_better": true,
+      "value": 1.0
+    }
+  },
+  "mode": "fake",
+  "version": 1
+}

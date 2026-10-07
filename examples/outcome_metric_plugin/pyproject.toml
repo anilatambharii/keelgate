@@ -1,0 +1,20 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "keelgate-example-metrics"
+version = "0.1.0"
+description = "Example external outcome metrics for Keelgate evals (Brier score, calibration error)."
+requires-python = ">=3.11"
+license = "Apache-2.0"
+dependencies = ["keelgate"]
+
+# This is the whole integration: declare an entry point in the keelgate.outcome_metrics group.
+# Keelgate discovers it after `pip install`, with no registration code and no change to Keelgate.
+[project.entry-points."keelgate.outcome_metrics"]
+brier_score = "keelgate_example_metrics:BrierScore"
+expected_calibration_error = "keelgate_example_metrics:ExpectedCalibrationError"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/keelgate_example_metrics"]

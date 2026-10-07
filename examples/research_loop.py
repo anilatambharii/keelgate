@@ -1,6 +1,7 @@
 """Keelgate research loop: a budgeted, resumable agent loop whose tools are also served over MCP.
 
     python examples/research_loop.py
+    python examples/research_loop.py --trace    # also export the trace to Jaeger (make up)
 
 What it shows, in order (no network, no API keys, nothing real is ever executed):
 
@@ -12,12 +13,18 @@ What it shows, in order (no network, no API keys, nothing real is ever executed)
 4. The same governed tools are **served over MCP**; a client calls one (allowed) and tries
    another (denied by policy). Tool output reaches the client labelled untrusted.
 
+With --trace the whole run, including the restart, is ONE trace in Jaeger
+(http://localhost:16686): a root span, a span per loop step, a chat span per model call with
+tokens and cost, and a tool span per call with a policy-decision span under each WRITE. Prompts,
+arguments and tool output are never put in spans.
+
 The "model" is a script. What matters is that every proposal goes through the gateway, and the
 gateway, not the proposer, decides.
 """
 
 from __future__ import annotations
 
+import argparse
 import asyncio
 import json
 import shutil
@@ -30,12 +37,13 @@ from typing import Any
 from mcp import Client, types
 from pydantic import BaseModel, Field
 
+from keelgate import telemetry
 from keelgate.adapters.governed import GovernedToolset
 from keelgate.adapters.mcp import GovernedMCPServer
 from keelgate.approvals import ApprovalQueue
 from keelgate.audit import AuditLog, SqliteAuditStore
 from keelgate.capabilities import GrantSigner, GrantVerifier, SqliteBudgetLedger, issue_grant
-from keelgate.llm import Usage
+from keelgate.llm import ModelPrice, PricingTable
 from keelgate.loop import LLMPlanner, Loop, SqliteCheckpointStore, StopConditions, StopReason
 from keelgate.policy import PolicyContext, RegoEngine
 from keelgate.testing import FakeLLM, Reply
@@ -83,6 +91,7 @@ class OrderOut(BaseModel):
 
 # Orders actually placed. Because the loop is durable, this must end with exactly one entry.
 BLOTTER: list[str] = []
+TRACE: dict[str, str] = {}  # the run's trace id, for the closing printout
 
 
 @tool(capability="market_data:read", side_effect=SideEffect.READ, cost_estimate=1.0)
@@ -147,7 +156,7 @@ class Process:
         return Loop(
             gateway=self.gateway,
             registry=self.registry,
-            planner=LLMPlanner(llm, "scripted-model"),
+            planner=LLMPlanner(llm, MODEL),
             checkpoints=self.checkpoints,
             grant_token=self.grant,
             policy_context=policy_context,
@@ -162,15 +171,24 @@ class Process:
         self.ledger.close()
 
 
+MODEL = "scripted-model"
+PRICES = PricingTable({MODEL: ModelPrice(input_per_mtok=3.0, output_per_mtok=15.0)})
+FIRST_BUDGET = 900  # tokens
+
+
 def script() -> list[Reply]:
-    """Each planning call reports 100 input tokens, so the budget arithmetic is easy to follow."""
-    hundred = Usage(input_tokens=100, output_tokens=0)
+    """Each planning call reports 100 tokens in and 400 out, priced from the table above.
+
+    The output is what crosses the budget: the loop refuses a call whose *prompt* alone would
+    not fit, but cannot know in advance how long an answer will be.
+    """
+    used = PRICES.usage(MODEL, 100, 400)
     return [
-        Reply.call("market_quote", symbol="AAPL", usage=hundred),
+        Reply.call("market_quote", symbol="AAPL", usage=used),
         Reply.call(
-            "paper_order", symbol="AAPL", notional=5_000, client_order_id="order-1", usage=hundred
+            "paper_order", symbol="AAPL", notional=5_000, client_order_id="order-1", usage=used
         ),
-        Reply.say("Bought 5,000 of AAPL at the quoted price of 187.25.", usage=hundred),
+        Reply.say("Bought 5,000 of AAPL at the quoted price of 187.25.", usage=used),
     ]
 
 
@@ -204,26 +222,28 @@ async def serve_over_mcp(process: Process) -> None:
                 print("      output is labelled under the key 'untrusted_tool_output'")
 
 
-async def main() -> int:
+async def main(trace: bool = False) -> int:
     root = Path(tempfile.mkdtemp(prefix="keelgate-research-"))
     engine = RegoEngine()
     signer = GrantSigner.generate(key_id="demo-key")
+    tel = telemetry.instrument(service_name="keelgate-research-loop") if trace else None
     print("\nKeelgate research loop - budgeted, resumable, governed\n")
     try:
-        print("1. Run the loop with a 150-token budget")
+        print(f"1. Run the loop with a {FIRST_BUDGET}-token budget")
         first = Process(root, signer, engine)
-        llm = FakeLLM(script(), indexed=True)
+        scripted = FakeLLM(script(), indexed=True, pricing=PRICES, model=MODEL)
+        llm = telemetry.InstrumentedLLM(scripted)  # every model call becomes a span with cost
         stopped = await first.loop(llm).run(
             goal=GOAL,
             tenant_id=TENANT,
             agent_id=AGENT,
             as_of=AS_OF,
             run_id=RUN_ID,
-            stop=StopConditions(max_tokens=150),
+            stop=StopConditions(max_tokens=FIRST_BUDGET),
         )
         print(
             f"   stopped: {stopped.stop_reason.value if stopped.stop_reason else '?'}"
-            f" after {stopped.state.tokens_used} tokens, {llm.calls_made} model calls"
+            f" after {stopped.state.tokens_used} tokens, {scripted.calls_made} model calls"
         )
         print(f"   resumable: {stopped.resumable}   orders placed so far: {len(BLOTTER)}")
         if stopped.stop_reason is not StopReason.TOKEN_BUDGET or BLOTTER:
@@ -231,7 +251,7 @@ async def main() -> int:
             return 1
         first.close()
 
-        print("\n2. 'Restart': rebuild every object over the same files, resume with 1,000 tokens")
+        print("\n2. 'Restart': rebuild every object over the same files, resume with 10,000 tokens")
         second = Process(root, signer, engine)
         done = await second.loop(llm).run_or_resume(
             goal=GOAL,
@@ -239,11 +259,11 @@ async def main() -> int:
             agent_id=AGENT,
             as_of=AS_OF,
             run_id=RUN_ID,
-            stop=StopConditions(max_tokens=1_000),
+            stop=StopConditions(max_tokens=10_000),
         )
         print(f"   finished: {done.ok}   answer: {done.final_answer!r}")
         print(
-            f"   model calls in total: {llm.calls_made} (the saved plan was NOT re-planned)"
+            f"   model calls in total: {scripted.calls_made} (the saved plan was NOT re-planned)"
             f"   orders placed: {BLOTTER}"
         )
         if not done.ok or BLOTTER != ["order-1"]:
@@ -251,15 +271,27 @@ async def main() -> int:
             return 1
         chain = second.audit.verify_chain(TENANT)
         print(f"   audit chain across both processes: {'OK' if chain.ok else 'BROKEN'}")
+        TRACE["id"] = done.state.trace_id
 
         print("\n3. Serve the same governed tools over MCP")
         await serve_over_mcp(second)
         second.close()
     finally:
         shutil.rmtree(root, ignore_errors=True)
+    if tel is not None:
+        costs = tel.costs.total(tenant_id=TENANT, agent_id=AGENT)
+        print(
+            f"\n4. Telemetry: {costs.calls} model calls, {costs.total_tokens} tokens, "
+            f"${costs.cost_usd:.6f} attributed to {TENANT}/{AGENT}"
+        )
+        tel.shutdown()  # flush the batch exporter
+        print(f"   trace id: {TRACE['id']}")
+        print(f"   open: http://localhost:16686/trace/{TRACE['id']}")
     print("\nDone: one budget stop, one resume, one order, every call governed.\n")
     return 0
 
 
 if __name__ == "__main__":
-    sys.exit(asyncio.run(main()))
+    parser = argparse.ArgumentParser(description="Budgeted, resumable research loop")
+    parser.add_argument("--trace", action="store_true", help="export the trace over OTLP/HTTP")
+    sys.exit(asyncio.run(main(trace=parser.parse_args().trace)))

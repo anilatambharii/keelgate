@@ -23,6 +23,8 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, Final, Protocol
 
+from opentelemetry.trace import Status, StatusCode
+
 from keelgate.approvals.models import ApprovalStatus
 from keelgate.audit.records import EventType
 from keelgate.context import (
@@ -56,11 +58,14 @@ from keelgate.loop.state import (
     VerdictRecord,
 )
 from keelgate.loop.stop import StopConditions
+from keelgate.telemetry import attributes as attr
+from keelgate.telemetry.core import set_attributes, span
+from keelgate.telemetry.hooks import run_span
 from keelgate.tools.outcomes import ErrorCode, OutcomeStatus, ToolOutcome
 from keelgate.tools.spec import SideEffect
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Sequence
+    from collections.abc import Callable, Mapping, Sequence
 
     from keelgate.approvals.queue import ApprovalQueue
     from keelgate.audit.log import AuditLog
@@ -70,7 +75,6 @@ if TYPE_CHECKING:
     from keelgate.loop.checkpoint import CheckpointStore
     from keelgate.memory.tiers import EpisodicMemory
     from keelgate.policy.types import PolicyContext
-    from keelgate.tools.gateway import ToolGateway
     from keelgate.tools.spec import ToolRegistry
 
 DEFAULT_SYSTEM_PROMPT: Final = (
@@ -95,6 +99,20 @@ class RunExistsError(Exception):
 
 class RunNotFoundError(Exception):
     """``resume`` found no checkpoint for that tenant and run id."""
+
+
+class ToolCaller(Protocol):
+    """What the loop needs from a gateway: one governed call. ``ToolGateway`` is the real one;
+    replay substitutes a recorded one that runs nothing."""
+
+    async def call(
+        self,
+        *,
+        tool_name: str,
+        arguments: Mapping[str, Any],
+        grant_token: str,
+        context: Any,
+    ) -> ToolOutcome: ...
 
 
 class OutcomeConfirmer(Protocol):
@@ -158,7 +176,7 @@ class Loop:
     def __init__(
         self,
         *,
-        gateway: ToolGateway,
+        gateway: ToolCaller,
         registry: ToolRegistry,
         planner: Planner,
         checkpoints: CheckpointStore,
@@ -227,20 +245,34 @@ class Loop:
         if self._checkpoints.load(tenant_id, rid) is not None:
             raise RunExistsError(f"run {rid!r} already exists; use resume() or run_or_resume()")
         now = self._clock()
-        state = LoopState(
-            run_id=rid,
+        # One run is one trace: the root span's trace id becomes the run's trace id (unless the
+        # caller supplied one), and a resume in any process parents on this same root.
+        with run_span(
             tenant_id=tenant_id,
             agent_id=agent_id,
-            trace_id=trace_id or uuid.uuid4().hex,
-            loop_type=self._loop_type,
-            goal=goal,
-            as_of=as_of,
-            created_at=now,
-            updated_at=now,
-        )
-        run = _Run(state, stop or self._stop, now)
-        self._save(run, "start")
-        return await self._drive(run)
+            run_id=rid,
+            loop_type=self._loop_type.value,
+            trace_id=trace_id,
+            extra={attr.AS_OF: as_of.isoformat()},
+        ) as root:
+            state = LoopState(
+                run_id=rid,
+                tenant_id=tenant_id,
+                agent_id=agent_id,
+                trace_id=trace_id or root.trace_id or uuid.uuid4().hex,
+                root_span_id=root.span_id or "",
+                loop_type=self._loop_type,
+                goal=goal,
+                as_of=as_of,
+                created_at=now,
+                updated_at=now,
+            )
+            set_attributes(root.span, {"keelgate.trace_id": state.trace_id})
+            run = _Run(state, stop or self._stop, now)
+            self._save(run, "start")
+            result = await self._drive(run)
+            self._close_run_span(root.span, result.state)
+            return result
 
     async def resume(
         self, tenant_id: str, run_id: str, *, stop: StopConditions | None = None
@@ -254,7 +286,33 @@ class Loop:
             raise RunNotFoundError(f"no run {run_id!r} for tenant {tenant_id!r}")
         if state.finished:
             return LoopResult(state)
-        return await self._drive(_Run(state, stop or self._stop, self._clock()))
+        with run_span(
+            tenant_id=tenant_id,
+            agent_id=state.agent_id,
+            run_id=run_id,
+            loop_type=state.loop_type.value,
+            trace_id=state.trace_id,
+            root_span_id=state.root_span_id or None,
+            resumed=True,
+            extra={attr.AS_OF: state.as_of.isoformat(), "keelgate.trace_id": state.trace_id},
+        ) as root:
+            result = await self._drive(_Run(state, stop or self._stop, self._clock()))
+            self._close_run_span(root.span, result.state)
+            return result
+
+    @staticmethod
+    def _close_run_span(root: Any, state: LoopState) -> None:
+        set_attributes(
+            root,
+            {
+                attr.STOP_REASON: state.stop_reason.value if state.stop_reason else None,
+                attr.ITERATION: state.iteration,
+                "keelgate.loop.tokens_used": state.tokens_used,
+                "keelgate.loop.dollars_used": state.dollars_used,
+            },
+        )
+        if state.stop_reason is StopReason.ERROR:
+            root.set_status(Status(StatusCode.ERROR, "loop error"))
 
     async def run_or_resume(
         self,
@@ -333,15 +391,16 @@ class Loop:
 
     async def _step(self, run: _Run) -> StopReason | None:
         phase = run.state.phase
-        if phase is Phase.PLAN:
-            return await self._plan(run)
-        if phase is Phase.ACT:
-            return await self._act(run)
-        if phase is Phase.OBSERVE:
-            return self._observe(run)
-        if phase is Phase.VERIFY:
+        if phase is Phase.DONE:
+            return StopReason.GOAL_REACHED
+        with span(f"keelgate.loop.{phase.value}", attributes={attr.ITERATION: run.state.iteration}):
+            if phase is Phase.PLAN:
+                return await self._plan(run)
+            if phase is Phase.ACT:
+                return await self._act(run)
+            if phase is Phase.OBSERVE:
+                return self._observe(run)
             return await self._verify(run)
-        return StopReason.GOAL_REACHED  # DONE
 
     def _stop_reason(self, run: _Run) -> StopReason | None:
         state, stop = run.state, run.stop
