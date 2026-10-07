@@ -22,12 +22,18 @@ MAX_REASON_LENGTH = 300
 
 
 class Decision(StrEnum):
+    """What a policy engine decides: ``ALLOW``, ``DENY`` or ``REQUIRE_APPROVAL``."""
+
     ALLOW = "ALLOW"
     DENY = "DENY"
     REQUIRE_APPROVAL = "REQUIRE_APPROVAL"
 
 
 class PolicyAction(BaseModel):
+    """The proposed action a policy judges: the tool, its side effect and capability, and its
+    arguments.
+    """
+
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     tool: str
@@ -37,6 +43,8 @@ class PolicyAction(BaseModel):
 
 
 class PolicyActor(BaseModel):
+    """Who is acting, as verified from the grant: the agent, the tenant and the grant id."""
+
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     agent_id: str
@@ -65,6 +73,12 @@ class PolicyContext(BaseModel):
 
 
 class PolicyInput(BaseModel):
+    """Everything a policy engine is given: the action, the actor, the resource facts derived from
+    validated arguments, and the trusted context.
+
+    Built by Keelgate, never by the model.
+    """
+
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     action: PolicyAction

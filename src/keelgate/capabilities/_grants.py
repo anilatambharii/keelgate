@@ -138,6 +138,11 @@ class GrantSigner:
 
 
 class RevocationList(Protocol):
+    """Where revoked grant ids are recorded.
+
+    Implement this to share revocations across processes.
+    """
+
     def is_revoked(self, grant_id: str) -> bool: ...
 
 
@@ -355,6 +360,12 @@ def _b64url_decode(segment: str) -> bytes:
 
 
 class BudgetLedger(Protocol):
+    """Where a grant's remaining budget is tracked.
+
+    Implement this to share budgets across processes. Reservations must be atomic so spend can
+    never exceed the grant.
+    """
+
     def try_reserve(self, grant_id: str, amount: float, limit: float) -> bool: ...
 
     def release(self, grant_id: str, amount: float) -> None: ...

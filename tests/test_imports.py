@@ -35,6 +35,7 @@ CONTRACT_MODULES = [
 # Implementation packages that are not part of the Tycheon contract or an adapter.
 SUBPACKAGES = [
     "keelgate.llm.providers",
+    "keelgate._internal",
 ]
 
 ADAPTER_MODULES = [

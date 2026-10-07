@@ -33,6 +33,8 @@ def sanitize_for_display(text: str) -> str:
 
 
 class ApprovalStatus(StrEnum):
+    """Where an approval request is: pending, approved, rejected, expired or consumed."""
+
     PENDING = "PENDING"
     APPROVED = "APPROVED"
     REJECTED = "REJECTED"
@@ -41,6 +43,10 @@ class ApprovalStatus(StrEnum):
 
 
 class EvidenceSource(BaseModel):
+    """A source cited in an approval's evidence: where it came from, when it was retrieved, and a
+    hash of its content.
+    """
+
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     uri: str = Field(max_length=2048)
@@ -82,6 +88,10 @@ class Approver(BaseModel):
 
 
 class ApprovalRequest(BaseModel):
+    """A call parked for a human: the exact arguments' hash, the tier required, the evidence bundle,
+    and the request's status and decision.
+    """
+
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     request_id: str

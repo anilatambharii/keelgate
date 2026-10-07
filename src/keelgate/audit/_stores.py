@@ -24,6 +24,12 @@ BuildRecord = Callable[[int, str, str | None], AuditRecord]
 
 
 class AuditStore(Protocol):
+    """Where audit records are persisted (SQLite and Postgres ship).
+
+    Implement this to store the chain elsewhere. Appends must be atomic per tenant, and stored
+    records must not be editable in place.
+    """
+
     def append(self, tenant_id: str, build: BuildRecord) -> AuditRecord:
         """Atomically build and persist the tenant's next record.
 

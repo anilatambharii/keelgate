@@ -71,6 +71,10 @@ def genesis_hash(tenant_id: str) -> str:
 
 
 class AuditRecord(BaseModel):
+    """One hash-chained entry in a tenant's audit log: sequence, time, event type, actor, payload
+    and the hashes that link it to the one before.
+    """
+
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     tenant_id: str = Field(min_length=1)

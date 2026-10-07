@@ -47,12 +47,18 @@ MAX_GOAL_CHARS: Final = 4000
 
 
 class IntakeIn(BaseModel):
+    """The arguments of the governed ``a2a_task_intake`` tool: the remote task's text, id and
+    context.
+    """
+
     goal: str = Field(min_length=1, max_length=MAX_GOAL_CHARS)
     task_id: str = Field(min_length=1, max_length=200)
     context_id: str = Field(default="", max_length=200)
 
 
 class IntakeOut(BaseModel):
+    """The result of accepting an A2A task: whether it was accepted and its id."""
+
     accepted: bool
     task_id: str
 

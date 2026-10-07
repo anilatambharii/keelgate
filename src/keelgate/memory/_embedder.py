@@ -15,6 +15,8 @@ _WORD = re.compile(r"\w+")
 
 @runtime_checkable
 class Embedder(Protocol):
+    """Turns text into a vector of a fixed size (``dim``) for semantic search."""
+
     dim: int
 
     def embed(self, texts: Sequence[str]) -> list[list[float]]: ...

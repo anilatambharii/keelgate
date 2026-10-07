@@ -28,12 +28,16 @@ STATE_VERSION: Final = 1
 
 
 class LoopType(StrEnum):
+    """The kind of run: a ``TASK``, a read-only ``VERIFICATION``, or a ``MONITOR`` tick."""
+
     TASK = "task"
     VERIFICATION = "verification"
     MONITOR = "monitor"
 
 
 class Phase(StrEnum):
+    """Where a run is in its cycle: plan, act, observe, verify, or done."""
+
     PLAN = "plan"
     ACT = "act"
     OBSERVE = "observe"
@@ -42,6 +46,10 @@ class Phase(StrEnum):
 
 
 class StopReason(StrEnum):
+    """Why a run stopped: the goal was reached, a limit was hit (iterations, tokens, dollars, time),
+    the verifier rejected too often, an outcome is unknown, an approval is pending, or an error.
+    """
+
     GOAL_REACHED = "goal_reached"
     MAX_ITERATIONS = "max_iterations"
     TOKEN_BUDGET = "token_budget"  # noqa: S105 - a stop reason, not a credential
@@ -61,6 +69,10 @@ TERMINAL_REASONS: Final = frozenset({StopReason.GOAL_REACHED, StopReason.VERIFIE
 
 
 class ActionStatus(StrEnum):
+    """Where a planned action stands: pending, done, denied, error, awaiting approval, unknown (may
+    or may not have happened) or abandoned.
+    """
+
     PENDING = "pending"
     DONE = "done"
     DENIED = "denied"
@@ -77,6 +89,10 @@ SETTLED_ACTIONS: Final = frozenset(
 
 
 class ActionOutcome(BaseModel):
+    """What happened to one planned action: status, error code and fixed-wording detail, and the
+    tool output as untrusted JSON text.
+    """
+
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     status: str
@@ -93,6 +109,10 @@ class ActionOutcome(BaseModel):
 
 
 class PlannedAction(BaseModel):
+    """One tool call the planner chose, written down before it runs so a resume re-submits the same
+    arguments.
+    """
+
     model_config = ConfigDict(extra="forbid")
 
     action_id: str
@@ -114,6 +134,12 @@ class VerdictRecord(BaseModel):
 
 
 class LoopState(BaseModel):
+    """Everything a run needs to resume: the goal, the phase, the planned actions and their
+    outcomes, usage, and the trace identity.
+
+    This is what is checkpointed.
+    """
+
     model_config = ConfigDict(extra="forbid")
 
     state_version: int = STATE_VERSION

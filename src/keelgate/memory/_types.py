@@ -33,6 +33,8 @@ if TYPE_CHECKING:
 
 
 class MemoryTier(StrEnum):
+    """The four layers of memory: working, episodic, semantic and procedural."""
+
     WORKING = "working"
     EPISODIC = "episodic"
     SEMANTIC = "semantic"
@@ -65,6 +67,10 @@ class Attribution(BaseModel):
 
 
 class MemoryRecord(BaseModel):
+    """One version of one memory: its content, who wrote it and under which trace, when it was
+    recorded, and for semantic facts the window in which it is valid.
+    """
+
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     record_id: str

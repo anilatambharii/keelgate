@@ -17,6 +17,8 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class Role(StrEnum):
+    """Who said a message: system, user, assistant or tool."""
+
     SYSTEM = "system"
     USER = "user"
     ASSISTANT = "assistant"
@@ -34,6 +36,10 @@ class ToolCall(BaseModel):
 
 
 class Message(BaseModel):
+    """One message in a conversation: a role, text, any tool calls the assistant made, and for a
+    tool result which call it answers.
+    """
+
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     role: Role
@@ -55,6 +61,11 @@ class ToolSchema(BaseModel):
 
 
 class LLMRequest(BaseModel):
+    """A provider-neutral request: model, messages, the tools offered, a token limit.
+
+    ``metadata`` is for correlation only and is never sent to a provider.
+    """
+
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     model: str
@@ -81,6 +92,8 @@ class Usage(BaseModel):
 
 
 class FinishReason(StrEnum):
+    """Why a model stopped: a natural stop, tool calls, the length limit, or something else."""
+
     STOP = "stop"
     TOOL_CALLS = "tool_calls"
     LENGTH = "length"
@@ -88,6 +101,12 @@ class FinishReason(StrEnum):
 
 
 class LLMResponse(BaseModel):
+    """A provider-neutral reply: one assistant message, usage with cost if known, and why it
+    stopped.
+
+    Nothing in it is trusted.
+    """
+
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     message: Message
@@ -131,5 +150,7 @@ class LLMAuthError(LLMError):
 
 
 class LLMRateLimitError(LLMError):
+    """The provider asked the caller to slow down. Retryable."""
+
     def __init__(self, message: str, *, provider: str = "") -> None:
         super().__init__(message, provider=provider, retryable=True)

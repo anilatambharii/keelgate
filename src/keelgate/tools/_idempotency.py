@@ -28,6 +28,13 @@ if TYPE_CHECKING:
 
 
 class ClaimState(StrEnum):
+    """Where an idempotency key stands when a caller tries to claim it.
+
+    ``NEW`` may run; ``DONE`` replays the stored result; ``IN_FLIGHT`` is running now;
+    ``UNKNOWN`` died mid-flight and must never be retried automatically; ``CONFLICT`` means the
+    key was reused for different arguments.
+    """
+
     NEW = "NEW"
     DONE = "DONE"
     CONFLICT = "CONFLICT"
@@ -48,6 +55,12 @@ class Claim:
 
 
 class IdempotencyStore(Protocol):
+    """Where idempotency keys and stored results live.
+
+    Implement this to share them across processes. ``claim`` must be atomic, and a key left in
+    flight by a process that died must read as ``UNKNOWN``.
+    """
+
     def peek(self, tenant_id: str, tool: str, key: str, args_hash: str) -> Claim: ...
 
     def claim(self, tenant_id: str, tool: str, key: str, args_hash: str) -> Claim: ...

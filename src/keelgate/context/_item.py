@@ -21,6 +21,10 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class ItemKind(StrEnum):
+    """What a context item is: system text, an instruction, the task, an observation, memory, a
+    document or a summary.
+    """
+
     SYSTEM = "system"
     INSTRUCTION = "instruction"
     TASK = "task"
@@ -31,6 +35,10 @@ class ItemKind(StrEnum):
 
 
 class Trust(StrEnum):
+    """Whether a context item may be treated as an instruction (``TRUSTED``) or only as data
+    (``UNTRUSTED``).
+    """
+
     TRUSTED = "trusted"
     UNTRUSTED = "untrusted"
 
@@ -50,6 +58,11 @@ class Provenance(BaseModel):
 
 
 class ContextItem(BaseModel):
+    """One piece of context: its content, trust level, publication time and provenance.
+
+    Only harness-authored kinds can be trusted; anything from outside is untrusted by type.
+    """
+
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     item_id: str = Field(min_length=1, max_length=200)

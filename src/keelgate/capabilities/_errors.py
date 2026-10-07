@@ -26,12 +26,18 @@ class UnknownKeyError(GrantError):
 
 
 class GrantExpiredError(GrantError):
+    """The grant's lifetime has ended."""
+
     code = "grant_expired"
 
 
 class GrantNotYetValidError(GrantError):
+    """The grant's not-before time has not arrived."""
+
     code = "grant_not_yet_valid"
 
 
 class GrantRevokedError(GrantError):
+    """The grant was revoked after it was issued."""
+
     code = "grant_revoked"

@@ -28,6 +28,7 @@ try:
     from temporalio import activity, workflow
     from temporalio.common import RetryPolicy
     from temporalio.worker import Worker
+    from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner, SandboxRestrictions
 except ImportError as exc:  # pragma: no cover - depends on the extra
     raise ImportError(
         "keelgate.adapters.temporal needs the Temporal SDK: pip install 'keelgate[temporal]'"
@@ -111,6 +112,14 @@ def build_worker(
 ) -> Worker:
     """A worker serving the loop workflow and its activity."""
     activities = LoopActivities(loop_factory)
+    # The workflow module lives inside keelgate.adapters, whose package import pulls in the
+    # signing library; the sandbox cannot re-import that, and the workflow itself is trivial.
+    worker_kwargs.setdefault(
+        "workflow_runner",
+        SandboxedWorkflowRunner(
+            restrictions=SandboxRestrictions.default.with_passthrough_modules("keelgate")
+        ),
+    )
     return Worker(
         client,
         task_queue=task_queue,

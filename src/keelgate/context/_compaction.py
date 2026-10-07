@@ -28,6 +28,10 @@ MAX_FACT_CHARS = 200
 
 
 class StructuredSummary(BaseModel):
+    """A compacted summary: facts, decisions and open questions, plus pointers back to the full
+    records it replaced.
+    """
+
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     facts: tuple[str, ...] = ()
@@ -53,6 +57,12 @@ class StructuredSummary(BaseModel):
 
 @runtime_checkable
 class Summarizer(Protocol):
+    """Compacts items into a structured summary.
+
+    A summary of untrusted text stays untrusted, and the pointers to the originals are not the
+    summarizer's to forge.
+    """
+
     async def summarize(self, items: Sequence[ContextItem]) -> StructuredSummary: ...
 
 

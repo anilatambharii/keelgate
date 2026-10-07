@@ -32,6 +32,12 @@ if TYPE_CHECKING:
 
 
 class MemoryBackend(Protocol):
+    """Storage for memory records.
+
+    Append-only and bitemporal: a write is a new version, never an edit, and a read honours both
+    when a fact was true and when it was recorded.
+    """
+
     def append(self, record: MemoryRecord, embedding: Sequence[float] | None) -> None: ...
 
     def latest(self, tenant_id: str, record_id: str) -> MemoryRecord | None:

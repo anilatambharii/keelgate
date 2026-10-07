@@ -25,6 +25,12 @@ T = TypeVar("T")
 
 
 class OutcomeStatus(StrEnum):
+    """The four things a gateway call can end as.
+
+    ``OK``, ``DENIED`` (policy or authority said no), ``APPROVAL_REQUIRED`` (parked for a human)
+    and ``ERROR``.
+    """
+
     OK = "OK"
     DENIED = "DENIED"
     APPROVAL_REQUIRED = "APPROVAL_REQUIRED"
@@ -32,6 +38,11 @@ class OutcomeStatus(StrEnum):
 
 
 class ErrorCode(StrEnum):
+    """Why the gateway refused or failed a call.
+
+    Stable machine-readable codes, safe to show a model: they never carry model-supplied text.
+    """
+
     NOT_AUTHORISED = "not_authorised"
     CAPABILITY_DENIED = "capability_denied"
     UNKNOWN_TOOL = "unknown_tool"
@@ -54,6 +65,10 @@ class ErrorCode(StrEnum):
 
 
 class ToolError(BaseModel):
+    """A refusal or failure a model can act on: a code, fixed-wording message and hint, and whether
+    a retry could help.
+    """
+
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     code: ErrorCode

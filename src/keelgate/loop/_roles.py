@@ -63,6 +63,11 @@ class Plan:
 
 @runtime_checkable
 class Planner(Protocol):
+    """Proposes the next step: tool calls to run, or a final answer.
+
+    A planner is untrusted; its proposals go through the gateway like any other.
+    """
+
     async def plan(self, request: PlanRequest) -> Plan: ...
 
 
@@ -123,6 +128,8 @@ class LLMPlanner:
 
 
 class VerdictDecision(StrEnum):
+    """A verifier's answer: ``ACCEPT``, ``REVISE`` or ``REJECT``."""
+
     ACCEPT = "ACCEPT"
     REVISE = "REVISE"
     REJECT = "REJECT"
@@ -173,6 +180,12 @@ class VerifyRequest:
 
 @runtime_checkable
 class Verifier(Protocol):
+    """Judges a proposed final answer.
+
+    Its verdict steers the loop but can never authorise an action. A verifier that cannot be
+    understood counts as a rejection.
+    """
+
     async def verify(self, request: VerifyRequest) -> Verdict: ...
 
 

@@ -55,22 +55,34 @@ class ApprovalError(Exception):
 
 
 class ApprovalNotFoundError(ApprovalError):
+    """No such request for this tenant. Another tenant's request is reported the same way."""
+
     code = "approval_not_found"
 
 
 class ApprovalNotPendingError(ApprovalError):
+    """The request was already decided."""
+
     code = "approval_not_pending"
 
 
 class ApprovalExpiredError(ApprovalError):
+    """The approval request expired before it was decided or used."""
+
     code = "approval_expired"
 
 
 class ApprovalNotAuthorisedError(ApprovalError):
+    """The approver may not decide this request: wrong tenant, tier too low, or the requester
+    itself.
+    """
+
     code = "approval_not_authorised"
 
 
 class ApprovalSignoffError(ApprovalError):
+    """An explicit sign-off was required and the code supplied was missing or wrong."""
+
     code = "approval_signoff_invalid"
 
 

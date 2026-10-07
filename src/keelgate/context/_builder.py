@@ -67,6 +67,10 @@ class ContextBudgetError(ContextError):
 
 
 class RejectionReason(StrEnum):
+    """Why an item was kept out of the context: published after ``as_of``, undated, or a duplicate
+    id.
+    """
+
     AS_OF_VIOLATION = "as_of_violation"
     UNDATED = "undated"
     DUPLICATE = "duplicate"

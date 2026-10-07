@@ -52,6 +52,8 @@ class ExternalArgs(BaseModel):
 
 
 class ExternalOutput(BaseModel):
+    """What a governed external MCP tool returns, wrapped so it stays labelled untrusted."""
+
     model_config = ConfigDict(extra="forbid")
 
     text: str = ""

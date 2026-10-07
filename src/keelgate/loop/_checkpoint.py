@@ -27,6 +27,12 @@ class StaleCheckpointError(Exception):
 
 @runtime_checkable
 class CheckpointStore(Protocol):
+    """Where loop state is saved after every step.
+
+    ``save`` is atomic and refuses a sequence number that is not newer, so a stale writer cannot
+    overwrite a newer checkpoint; ``load`` returns the latest state.
+    """
+
     def save(self, state: LoopState) -> None:
         """Persist ``state`` atomically. Raises :class:`StaleCheckpointError` if it is not newer."""
         ...

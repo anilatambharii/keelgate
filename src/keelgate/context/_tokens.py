@@ -8,6 +8,8 @@ from typing import Protocol, runtime_checkable
 
 @runtime_checkable
 class TokenCounter(Protocol):
+    """Counts the tokens in a piece of text, so the builder can honour a budget."""
+
     def count(self, text: str) -> int: ...
 
 

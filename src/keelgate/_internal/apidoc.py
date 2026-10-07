@@ -17,7 +17,7 @@ import inspect
 import re
 import sys
 from pathlib import Path
-from typing import Any, Final
+from typing import Any, Final, get_origin
 
 from keelgate._internal.api import (
     PROVISIONAL,
@@ -124,24 +124,34 @@ def signature_of(obj: Any) -> str:
     return f"({', '.join(parts)}){returns}"
 
 
+def own_doc(obj: Any) -> str:
+    """The docstring written on this object itself, never one inherited from a base class."""
+    raw = obj.__dict__.get("__doc__") if inspect.isclass(obj) else getattr(obj, "__doc__", None)
+    return inspect.cleandoc(raw) if isinstance(raw, str) else ""
+
+
 def has_real_doc(obj: Any) -> bool:
-    """False for no docstring, and for the signature text dataclasses generate in its place."""
-    if not (inspect.isclass(obj) or inspect.isfunction(obj) or inspect.ismodule(obj)):
-        return True
-    doc = (inspect.getdoc(obj) or "").strip()
+    """False for no docstring, an inherited one, or the signature text dataclasses generate."""
+    if get_origin(obj) is not None or not (
+        inspect.isclass(obj) or inspect.isfunction(obj) or inspect.ismodule(obj)
+    ):
+        return True  # a constant or a type alias: documented in the contract narrative
+    doc = own_doc(obj).strip()
     return bool(doc) and not doc.startswith(f"{getattr(obj, '__name__', '')}(")
 
 
 def _summary(obj: Any) -> str:
-    if not has_real_doc(obj):
+    if not has_real_doc(obj) or _kind(obj) in {"constant", "type alias"}:
         return ""
-    doc = inspect.getdoc(obj) or ""
+    doc = own_doc(obj)
     line = doc.strip().split("\n\n")[0].replace("\n", " ").strip()
     first = re.split(r"(?<=[.!?])\s", line, maxsplit=1)[0]
     return first.replace("|", "\\|")
 
 
 def _kind(obj: Any) -> str:  # noqa: PLR0911 - one return per kind reads best
+    if get_origin(obj) is not None:
+        return "type alias"
     if inspect.ismodule(obj):
         return "module"
     if inspect.isclass(obj):
@@ -188,6 +198,8 @@ def _signature_block(name: str, obj: Any, module: str) -> list[str]:  # noqa: PL
         return [f"{name} = {stable_repr(obj)}"]
     if kind == "module":
         return [f"module {name}"]
+    if kind == "type alias":
+        return [f"type {name} = {_annotation(obj)}"]
     if kind == "constant":
         text = stable_repr(obj)
         return [
