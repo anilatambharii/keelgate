@@ -1,15 +1,16 @@
 """Policy-as-code decision point. Deterministic gate in front of every WRITE."""
 
-from keelgate.policy.engine import (
+from keelgate.policy._engine import (
     PolicyEngine,
     decision_from_result,
+    deny,
     hash_sources,
     load_pack_sources,
     pack_path,
 )
-from keelgate.policy.opa import OpaHttpEngine
-from keelgate.policy.rego import RegoEngine
-from keelgate.policy.types import (
+from keelgate.policy._opa import OpaHttpEngine
+from keelgate.policy._rego import RegoEngine
+from keelgate.policy._types import (
     Decision,
     PolicyAction,
     PolicyActor,
@@ -29,6 +30,7 @@ __all__ = [
     "PolicyInput",
     "RegoEngine",
     "decision_from_result",
+    "deny",
     "hash_sources",
     "load_pack_sources",
     "pack_path",

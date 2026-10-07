@@ -2,7 +2,7 @@
 
 Needs ``keelgate[a2a]``. ``build_agent_card`` describes the agent; ``build_a2a_app`` serves it with
 the JSON-RPC binding. Every inbound task passes the governed ``a2a_task_intake`` tool first (see
-:mod:`keelgate.adapters.a2a.intake`), and remote text is always treated as untrusted.
+:mod:`keelgate.adapters.a2a._intake`), and remote text is always treated as untrusted.
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ except ImportError as exc:  # pragma: no cover - depends on the extra
         "keelgate.adapters.a2a needs the A2A SDK: pip install 'keelgate[a2a]'"
     ) from exc
 
-from keelgate.adapters.a2a.intake import (
+from keelgate.adapters.a2a._intake import (
     INTAKE_TOOL,
     GovernedA2AExecutor,
     IntakeIn,
@@ -34,8 +34,8 @@ from keelgate.adapters.a2a.intake import (
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from keelgate.adapters.a2a.intake import GrantResolver, TaskRunner
-    from keelgate.adapters.governed import GovernedToolset
+    from keelgate.adapters._governed import GovernedToolset
+    from keelgate.adapters.a2a._intake import GrantResolver, TaskRunner
 
 RPC_URL = "/a2a"
 

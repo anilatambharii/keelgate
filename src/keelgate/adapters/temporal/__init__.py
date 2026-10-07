@@ -28,20 +28,21 @@ try:
     from temporalio import activity, workflow
     from temporalio.common import RetryPolicy
     from temporalio.worker import Worker
+    from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner, SandboxRestrictions
 except ImportError as exc:  # pragma: no cover - depends on the extra
     raise ImportError(
         "keelgate.adapters.temporal needs the Temporal SDK: pip install 'keelgate[temporal]'"
     ) from exc
 
 with workflow.unsafe.imports_passed_through():
-    from keelgate.loop.runner import InProcessRunner, LoopOutcome, LoopRunner, LoopSpec
+    from keelgate.loop._runner import InProcessRunner, LoopOutcome, LoopRunner, LoopSpec
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
     from temporalio.client import Client
 
-    from keelgate.loop.engine import Loop
+    from keelgate.loop._engine import Loop
 
 ACTIVITY_NAME: Final = "keelgate_run_loop"
 WORKFLOW_NAME: Final = "KeelgateLoopWorkflow"
@@ -83,6 +84,11 @@ class WorkflowOptions:
 
 @workflow.defn(name=WORKFLOW_NAME)
 class KeelgateLoopWorkflow:
+    """A Temporal workflow that runs one loop as an activity.
+
+    A retried attempt resumes from the loop's checkpoint rather than starting over.
+    """
+
     @workflow.run
     async def run(self, spec: LoopSpec) -> LoopOutcome:
         options = WorkflowOptions()
@@ -106,6 +112,14 @@ def build_worker(
 ) -> Worker:
     """A worker serving the loop workflow and its activity."""
     activities = LoopActivities(loop_factory)
+    # The workflow module lives inside keelgate.adapters, whose package import pulls in the
+    # signing library; the sandbox cannot re-import that, and the workflow itself is trivial.
+    worker_kwargs.setdefault(
+        "workflow_runner",
+        SandboxedWorkflowRunner(
+            restrictions=SandboxRestrictions.default.with_passthrough_modules("keelgate")
+        ),
+    )
     return Worker(
         client,
         task_queue=task_queue,
@@ -116,7 +130,7 @@ def build_worker(
 
 
 class TemporalRunner:
-    """A :class:`~keelgate.loop.runner.LoopRunner` that starts the loop as a Temporal workflow.
+    """A :class:`~keelgate.loop._runner.LoopRunner` that starts the loop as a Temporal workflow.
 
     The workflow id is derived from the tenant and run id, so starting the same run twice attaches
     to the existing workflow instead of creating a second one.

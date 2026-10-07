@@ -36,7 +36,7 @@ except ImportError as exc:  # pragma: no cover - depends on the extra
 if TYPE_CHECKING:
     from claude_agent_sdk import McpSdkServerConfig, ToolPermissionContext
 
-    from keelgate.adapters.governed import GovernedToolset
+    from keelgate.adapters._governed import GovernedToolset
 
 # Claude Code's built-in tools. Named explicitly (as well as disabled wholesale) so a change to
 # the SDK's defaults cannot quietly re-enable one.

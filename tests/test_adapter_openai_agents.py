@@ -18,7 +18,7 @@ except Exception as exc:
         allow_module_level=True,
     )
 
-from keelgate.adapters.governed import UNTRUSTED_KEY, GovernedToolset
+from keelgate.adapters._governed import UNTRUSTED_KEY, GovernedToolset
 from keelgate.adapters.openai_agents import (
     KeelgateModel,
     governed_function_tools,

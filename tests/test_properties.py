@@ -311,7 +311,7 @@ def test_a_non_allowing_engine_means_no_write_ever(behaviour: str, tool_name: st
 
 def test_the_property_test_would_catch_a_gateway_that_skips_the_policy_gate() -> None:
     """Mutation check: prove the oracle has teeth by breaking the gate on purpose."""
-    from keelgate.tools import gateway as gateway_module
+    from keelgate.tools import _gateway as gateway_module
 
     engine = ScriptedEngine()
     engine.behaviour = "DENY"

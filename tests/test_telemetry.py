@@ -322,7 +322,7 @@ def test_content_capture_follows_the_environment_switch(monkeypatch: pytest.Monk
 def test_the_default_exporter_is_otlp_http_to_the_local_collector(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from keelgate.telemetry.setup import _otlp_exporter
+    from keelgate.telemetry._setup import _otlp_exporter
 
     monkeypatch.delenv("OTEL_EXPORTER_OTLP_ENDPOINT", raising=False)
     monkeypatch.delenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", raising=False)
@@ -336,7 +336,7 @@ def test_the_default_exporter_is_otlp_http_to_the_local_collector(
 def test_a_grpc_protocol_setting_is_refused_with_a_clear_message(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from keelgate.telemetry.setup import _otlp_exporter
+    from keelgate.telemetry._setup import _otlp_exporter
 
     monkeypatch.setenv("OTEL_EXPORTER_OTLP_PROTOCOL", "grpc")
     with pytest.raises(ValueError, match="OTLP/HTTP"):

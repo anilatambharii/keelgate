@@ -4,7 +4,7 @@ The REST surface lives in ``keelgate.approvals.rest`` and needs the ``server``
 extra; it is not imported here so the core stays dependency-light.
 """
 
-from keelgate.approvals.models import (
+from keelgate.approvals._models import (
     ApprovalRequest,
     ApprovalStatus,
     Approver,
@@ -13,7 +13,7 @@ from keelgate.approvals.models import (
     action_hash,
     sanitize_for_display,
 )
-from keelgate.approvals.queue import (
+from keelgate.approvals._queue import (
     ApprovalError,
     ApprovalExpiredError,
     ApprovalNotAuthorisedError,
@@ -23,7 +23,7 @@ from keelgate.approvals.queue import (
     ApprovalQueue,
     ApprovalSignoffError,
 )
-from keelgate.approvals.tiers import ApprovalTier
+from keelgate.approvals._tiers import ApprovalTier
 
 __all__ = [
     "ApprovalError",

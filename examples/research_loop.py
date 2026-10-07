@@ -38,7 +38,7 @@ from mcp import Client, types
 from pydantic import BaseModel, Field
 
 from keelgate import telemetry
-from keelgate.adapters.governed import GovernedToolset
+from keelgate.adapters import GovernedToolset
 from keelgate.adapters.mcp import GovernedMCPServer
 from keelgate.approvals import ApprovalQueue
 from keelgate.audit import AuditLog, SqliteAuditStore

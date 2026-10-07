@@ -5,7 +5,7 @@ policy decisions, approvals and memory. Nothing is exported until ``instrument()
 """
 
 from keelgate.telemetry import attributes
-from keelgate.telemetry.core import (
+from keelgate.telemetry._core import (
     RunContext,
     Telemetry,
     activate,
@@ -16,11 +16,11 @@ from keelgate.telemetry.core import (
     span,
     use,
 )
-from keelgate.telemetry.cost import UNATTRIBUTED, CostTotals, CostTracker
-from keelgate.telemetry.hooks import RunSpan, run_span, traced
-from keelgate.telemetry.llm import InstrumentedLLM
-from keelgate.telemetry.redaction import RedactingSpanProcessor, Redactor, redact_span
-from keelgate.telemetry.setup import instrument
+from keelgate.telemetry._cost import UNATTRIBUTED, CostTotals, CostTracker
+from keelgate.telemetry._hooks import RunSpan, run_span, traced
+from keelgate.telemetry._llm import InstrumentedLLM
+from keelgate.telemetry._redaction import RedactingSpanProcessor, Redactor, redact_span
+from keelgate.telemetry._setup import instrument
 
 __all__ = [
     "UNATTRIBUTED",

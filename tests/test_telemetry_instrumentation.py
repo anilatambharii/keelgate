@@ -17,7 +17,7 @@ from keelgate.loop import StopReason
 from keelgate.memory import Attribution, SemanticMemory, SqliteMemoryBackend
 from keelgate.telemetry import attributes as attr
 from keelgate.testing import FakeLLM, Reply
-from keelgate.tools.outcomes import OutcomeStatus
+from keelgate.tools._outcomes import OutcomeStatus
 from tests.conftest import MARKET_OPEN, Clock, Harness, build_harness, run
 from tests.loop_support import (
     AGENT,

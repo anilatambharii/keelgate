@@ -1,49 +1,70 @@
 # Integration contract
 
-This page defines the **public API** downstream projects may depend on. It is
-versioned with [semantic versioning](https://semver.org/) and is the only part of
-Keelgate that carries a stability promise.
+This page is the contract between Keelgate and the libraries built on it (Tycheon is the first). It
+says what you may depend on, how, and what the promise is. It has three parts that work together:
 
-!!! info "Status after Phase K3"
-    Every contract module is implemented: **tools, capabilities, policy, audit,
-    approvals** (K1); **loop, context, memory, llm, testing** and the framework
-    **adapters** (K2); **telemetry** and **evals** (K3). `tests/test_imports.py`
-    enforces the module list; the tables below are the symbol-level
-    specification.
+| Document | What it is | Who writes it |
+|---|---|---|
+| **This page** | Semantics, guarantees, the rules for depending on Keelgate, and a worked example | People |
+| [**API contract**](api-contract.md) | **Every public symbol** with its kind, stability level, full signature and summary | Generated from the code; a test fails if it is stale |
+| [**Versioning**](versioning.md) | What each version bump means, and how anything is deprecated | People |
+
+## Depending on Keelgate
+
+```toml
+# pyproject.toml of your library
+dependencies = ["keelgate>=0.2,<0.3"]          # pin a minor while Keelgate is 0.x
+```
+
+1. **Import from the package, never from a module inside it.** The public API is what each package
+   exports (`from keelgate.tools import ToolGateway`). Every module whose name starts with an
+   underscore is private, as is anything not in a package's `__all__`, and may change in any
+   release. `keelgate migrate-imports` fixes old deep imports for you.
+2. **Prefer stable symbols.** Each symbol in the [API contract](api-contract.md) is marked
+   *stable* or *provisional*. Provisional symbols may change in a minor release; pin the minor.
+3. **Treat enums as open.** A new member is a minor change. Do not write an exhaustive `match` that
+   crashes on an unknown member.
+4. **Extend through the protocols,** not by subclassing internals: `PolicyEngine`, `LLMClient`,
+   `CheckpointStore`, `IdempotencyStore`, `AuditStore`, `Planner`, `Verifier`, `OutcomeMetric`.
+5. **Register metrics by entry point** (`keelgate.outcome_metrics`), below.
+6. **Test with the testing kit,** not with mocks of internals: `FakeLLM` and the governed harness.
+
+The public API is enforced, not just documented: a test fails if a module that is not on the
+registry is importable by a plain name, if a public symbol has no docstring of its own, or if the
+generated API contract differs from the code. A second set of tests behaves like a downstream
+library and imports **only** the public API; another test fails if those files import anything
+else.
 
 ## Who depends on this
 
-[Tycheon](https://github.com/anilatambharii/tycheon), calibrated financial
-forecasting and risk, consumes Keelgate as a library (`pip install keelgate`).
-Anything **not** on this page is internal: importing it is allowed but
-unsupported, and it may change in a patch release.
+[Tycheon](https://github.com/anilatambharii/tycheon), calibrated financial forecasting and risk,
+consumes Keelgate as a library (`pip install keelgate`).
 
-## Stability policy
+## Stability
 
-| Change | Version bump | Also required |
-|---|---|---|
-| New module, class, function or optional keyword argument | minor | none |
-| New enum member | minor | Downstreams must not assume exhaustive matches |
-| Deprecation (symbol still works, warns) | minor | `DeprecationWarning` naming the replacement, and a note here |
-| Removal, rename, or any signature change | **major** | Migration note in the same PR, plus a changelog entry |
-| Behavioural change to a documented guarantee | **major** | Migration note, and an ADR explaining why |
+The full policy (version numbers, formats that are part of the contract, deprecation) is in
+[versioning](versioning.md). In short:
 
-Deprecations are announced for at least one minor release before removal. A
-breaking change may not merge without its migration note.
+| Level | Promise |
+|---|---|
+| **Stable** | Will not break without a version bump that says so, a changelog entry and a migration note (a minor bump while Keelgate is 0.x; a major one from 1.0). |
+| **Provisional** | Works and is tested, but may change in a **minor** release with a changelog entry. |
 
-## Stability tiers
+Stable: the safety core (`tools`, `capabilities`, `policy`, `audit`, `approvals`); `Loop`,
+`StopConditions`, `LoopResult`, `StopReason`, `CheckpointStore`; `ContextBuilder`, `ContextItem`;
+the `Memory` interface and its four tiers; the `LLMClient` protocol and its request, response and
+error types; `FakeLLM`; `GovernedToolset`; `instrument()`, `span`, `traced`; `OutcomeMetric`,
+`OutcomeRecord`, `MetricResult`, the `keelgate.outcome_metrics` group, `discover_metrics`,
+`run_suite`.
 
-Not everything on this page carries the same promise. Keelgate is pre-1.0, so the tiers below
-say what a downstream project can lean on today and what it should expect to move.
+Provisional: the model provider clients (vendor SDKs move fast); every framework adapter (so do the
+frameworks); memory backends and embedders; replay, the Temporal runner, `OutcomeConfirmer`,
+`LoopRunner` and `LoopSpec`; the testing harness and fixture names; telemetry attribute names (the
+GenAI conventions are still in development upstream); report formats, CLI flags and red-team case
+ids.
 
-| Tier | Meaning | What is in it |
-|---|---|---|
-| **Stable** | Follows the policy above. A breaking change needs a major bump and a migration note. | The K1 safety core (`tools`, `capabilities`, `policy`, `audit`, `approvals`); `Loop`, `StopConditions`, `LoopResult`, `StopReason`, `CheckpointStore`; `ContextBuilder`, `ContextItem`; the `Memory` interface and the four tiers; the `LLMClient` protocol and its request, response and error types; `FakeLLM`; `GovernedToolset`; `instrument()`, `span`, `traced`; `OutcomeMetric`, `OutcomeRecord`, `MetricResult`, the `keelgate.outcome_metrics` group, `discover_metrics`, `run_suite` |
-| **Provisional** | Works and is tested, but may change in a **minor** release, with a changelog entry. Pin a minor version if you depend on it. | `keelgate.llm.providers.*` (vendor SDKs move fast); `keelgate.adapters.*` (wrapped frameworks move too); memory backends and embedders; the Temporal runner; `keelgate.testing` harness and pytest fixture names; `OutcomeConfirmer`; `LoopRunner` and `LoopSpec`; telemetry attribute names (the GenAI conventions are still in development upstream); replay; report formats, CLI flags and red-team case ids |
-
-A symbol moves from Provisional to Stable when a downstream project has used it through a
-release without needing a change. The security guarantees at the end of this page are not
-tiered: they hold for every symbol in both tiers.
+The [guarantees at the end of this page](#guarantees-that-outlive-any-signature) are not tiered:
+they hold for every symbol in both levels.
 
 ## Implemented
 
@@ -69,6 +90,13 @@ with a matching, unexpired, single-use approval. A timed-out or crashed `WRITE`
 is parked `UNKNOWN` and never retried automatically. The audit record is written
 before the side effect.
 
+Supporting types: `ToolDefinitionError` (a tool declared unsafely, for example a `WRITE` without an
+idempotency key), `RegistryFrozenError` (registering after the gateway froze the registry),
+`PAPER_MODES` (the only execution modes v1 permits: `paper` and `simulation`), and `Claim` /
+`ClaimState` (the outcome of claiming an idempotency key: `NEW` may run, `DONE` replays the stored
+result, `IN_FLIGHT` is running now, `UNKNOWN` died mid-flight and is never retried, `CONFLICT`
+means the key was reused for different arguments).
+
 ### `keelgate.capabilities`
 
 | Symbol | Kind | Notes |
@@ -80,6 +108,11 @@ before the side effect.
 | `CapabilityGrant`, `Budget` | models | `grant.allows(capability)` is exact membership |
 | `GrantError` and subclasses | exceptions | `GrantInvalidError`, `GrantExpiredError`, `GrantNotYetValidError`, `GrantRevokedError`, `UnknownKeyError` |
 | `BudgetLedger`, `InMemoryBudgetLedger`, `SqliteBudgetLedger`, `RevocationList`, `InMemoryRevocationList`, `SqliteRevocationList` | protocols and stores | The SQLite versions survive restarts and are safe across handles and processes on one host; implement the protocols for shared use |
+
+Also exported: `InvalidCapabilityError` (a malformed capability, including any wildcard),
+`DEFAULT_MAX_TTL` (the longest grant lifetime a verifier accepts unless configured otherwise: 24
+hours), and the capability strings the shipped `finance_basic` pack understands:
+`MARKET_DATA_READ`, `TRADE_PROPOSE`, `TRADE_PAPER_EXECUTE` and `REPORT_WRITE`.
 
 See [ADR-0003](adr/0003-capability-grants-paseto.md).
 
@@ -96,6 +129,11 @@ See [ADR-0003](adr/0003-capability-grants-paseto.md).
 | `keelgate.policy.cedar.CedarEngine` | engine | Optional, extra `keelgate[cedar]`; a documented subset |
 | `pack_path(name)`, `load_pack_sources`, `hash_sources` | helpers | Locate and fingerprint packs |
 
+Helpers for writing your own engine: `deny(reason, engine=)` builds a fail-closed `DENY` decision,
+and `decision_from_result(raw, policy_version=, engine=)` turns an engine's raw answer into a
+decision, failing closed on anything malformed. `Decision`, `PolicyAction` and `PolicyActor` are the
+vocabulary of `PolicyInput`.
+
 Packs live in `policies/` and ship in the wheel. `finance_basic` is the first;
 see [ADR-0002](adr/0002-policy-engine.md) for the rules every pack follows.
 
@@ -111,6 +149,10 @@ see [ADR-0002](adr/0002-policy-engine.md) for the rules every pack follows.
 The hash input is a **stable format** pinned by a golden-vector test. Changing it
 invalidates every existing chain and is a major change.
 
+Also exported: `AuditStore` (the protocol a storage backend implements), `AuditError`,
+`canonical_json(value)` (the deterministic serialisation that gets hashed) and `genesis_hash(tenant)`
+(the `prev_hash` of a tenant's first record).
+
 ### `keelgate.approvals`
 
 | Symbol | Kind | Notes |
@@ -122,6 +164,14 @@ invalidates every existing chain and is a major change.
 | `action_hash(tool, args)` | function | What an approval is bound to |
 | `keelgate.approvals.rest.create_app(queue, tokens)` | FastAPI app | Extra `keelgate[server]` |
 | `keelgate-approvals` | CLI | `list`, `show`, `approve`, `reject` |
+
+Errors, each with a stable `.code`: `ApprovalNotFoundError` (unknown request, or another tenant's:
+reported identically), `ApprovalNotPendingError` (already decided), `ApprovalExpiredError`,
+`ApprovalNotAuthorisedError` (wrong tenant, tier too low, or the requester itself),
+`ApprovalSignoffError` (explicit sign-off code missing or wrong) and `ApprovalNotUsableError` (the
+request cannot back this execution). `ApprovalStatus` is `PENDING`, `APPROVED`, `REJECTED`,
+`EXPIRED` or `CONSUMED`. `sanitize_for_display(text)` strips control characters from model-derived
+text before a human sees it.
 
 ### `keelgate.loop`
 
@@ -146,6 +196,19 @@ output of a call cannot be known in advance, so a call can still overshoot by
 its output. See
 [ADR-0004](adr/0004-durable-loop-and-resume-semantics.md).
 
+The loop's data model: `LoopState` is everything a run needs to resume (what is checkpointed);
+`PlannedAction` and `ActionOutcome` record each tool call and its result; `ActionStatus` is
+`PENDING`, `DONE`, `DENIED`, `ERROR`, `AWAITING_APPROVAL`, `UNKNOWN` or `ABANDONED`; `Phase` is
+`PLAN`, `ACT`, `OBSERVE`, `VERIFY` or `DONE`; `LoopType` is `TASK`, `VERIFICATION` or `MONITOR`.
+The planner is handed a `PlanRequest` and returns a `Plan` of `ProposedAction`s or a final answer;
+the verifier is handed a `VerifyRequest` and returns a `Verdict` whose `VerdictDecision` is
+`ACCEPT`, `REVISE` or `REJECT`. `ContextSource` supplies extra, untrusted context for a plan step,
+`GoalPredicate` is the type of `StopConditions.goal`, and `DEFAULT_SYSTEM_PROMPT` is the loop's
+default prompt. Starting a run id that exists raises `RunExistsError`; resuming one that does not
+raises `RunNotFoundError`. Provisional: `MonitorSummary` and `READ_ONLY` (the side-effect set a
+read-only loop uses), and for replay `Recording`, `RecordedStep`, `RecordedAction`, `ReplayReport`,
+`Divergence`, `diff`, `find_run` and `NotReplayableError`.
+
 ### `keelgate.context`
 
 | Symbol | Kind | Notes |
@@ -155,6 +218,14 @@ its output. See
 | `BuiltContext`, `Rejection`, `RejectionReason` | results | Rejections record a hash of the content, never the content |
 | `StructuredSummary`, `Compaction`, `ExtractiveSummarizer`, `LLMSummarizer`, `RecordStore`, `InMemoryRecordStore` | compaction | Over-budget context is compacted into structured summaries that carry pointers to the full records |
 | `UNTRUSTED_NOTICE`, fenced `<untrusted ...>` blocks | rendering | Outside text is fenced and cannot break out of its fence |
+
+Errors, all subclasses of `ContextError`: `AsOfViolationError` (an item published after `as_of`),
+`UndatedItemError` (an outside item with no publication time), `DuplicateItemError` and
+`ContextBudgetError` (trusted content alone does not fit the budget). `Summarizer` and
+`TokenCounter` are the protocols you implement to change how context is compacted and counted;
+`ApproxTokenCounter` is the default (about four characters a token). `RejectionReason` is
+`AS_OF_VIOLATION`, `UNDATED` or `DUPLICATE`; `FENCE_TOKENS` is the token overhead charged per fenced
+item and `HARNESS_KINDS` the item kinds only the harness may mark trusted.
 
 ### `keelgate.memory`
 
@@ -171,6 +242,11 @@ Guarantees: reads honour `as_of` on both axes (valid time and record time);
 every operation is tenant-scoped; retrieved memory reaches a prompt only as an
 `UNTRUSTED` context item.
 
+Errors, all subclasses of `MemoryStoreError`: `RecordNotFoundError`, `ConcurrentWriteError` (another
+writer created the next version first) and `InvalidMemoryWriteError` (malformed for its tier).
+`MemoryBackend` is the protocol a storage backend implements; `cosine(a, b)` is the similarity
+function the shipped backends use.
+
 ### `keelgate.llm`
 
 | Symbol | Kind | Notes |
@@ -182,6 +258,9 @@ every operation is tenant-scoped; retrieved memory reaches a prompt only as an
 | `keelgate.llm.providers.AnthropicClient`, `OpenAIClient`, `GoogleClient`, `OllamaClient`, `VLLMClient` | clients | Optional SDKs are imported lazily. Contract-tested through the real SDKs over a mocked transport. Opt-in live smoke tests exist (`make test-live`) but have **not been run** by the project yet. `LLMRequest.temperature` is deliberately not sent to Anthropic, whose current API has no such parameter |
 
 ### `keelgate.testing`
+
+`ScriptExhaustedError` is raised when the code under test makes more model calls than the script has
+replies for, and `UnofferedToolError` when the script asks for a tool the request did not offer.
 
 | Symbol | Kind | Notes |
 |---|---|---|
@@ -197,13 +276,13 @@ through the same path: **registry, grant, policy, approvals, audit**
 
 | Module | Extra | What it provides |
 |---|---|---|
-| `keelgate.adapters.governed` | none | `GovernedToolset`: the one governed path every adapter uses |
-| `keelgate.adapters.langgraph` | `langgraph` | `governed_langchain_tools`, `KeelgateChatModel` (async only) |
-| `keelgate.adapters.openai_agents` | `openai` | `governed_function_tools`, `KeelgateModel` (non-streaming) |
-| `keelgate.adapters.claude_agent_sdk` | `anthropic` | `governed_sdk_mcp_server`, `governed_claude_options`: built-in tools off, other MCP servers off, settings off, `can_use_tool` allows only governed tools. Tested **at the boundary**: the CLI cannot run offline |
-| `keelgate.adapters.mcp` | `mcp` | `GovernedMCPServer` (stdio and streamable HTTP) exposes governed tools. `GovernedMCPClient` governs *consumed* tools: allowlist, capability mapping, optional schema-digest pinning, local argument validation, untrusted output |
-| `keelgate.adapters.a2a` | `a2a` | `build_agent_card`, `build_a2a_app`, `GovernedA2AExecutor`. Task intake is a governed PROPOSE tool (`a2a_task_intake`, capability `a2a:task_submit`); remote text is untrusted and never becomes the goal |
-| `keelgate.adapters.temporal` | `temporal` | `KeelgateLoopWorkflow`, `TemporalRunner`, `build_worker`: the loop as a Temporal activity |
+| `keelgate.adapters` | none | `GovernedToolset`: the one governed path every adapter uses; `UNTRUSTED_KEY`, the key tool output is returned under |
+| `keelgate.adapters.langgraph` | `langgraph` | `governed_langchain_tools`, `KeelgateChatModel` (async only), `to_keelgate_messages` |
+| `keelgate.adapters.openai_agents` | `openai` | `governed_function_tools`, `KeelgateModel` (non-streaming), `to_keelgate_messages` |
+| `keelgate.adapters.claude_agent_sdk` | `anthropic` | `governed_sdk_mcp_server`, `governed_claude_options`, `governed_tool_names`, `BUILTIN_TOOLS`: built-in tools off, other MCP servers off, settings off, `can_use_tool` allows only governed tools. Tested **at the boundary**: the CLI cannot run offline |
+| `keelgate.adapters.mcp` | `mcp` | `GovernedMCPServer` (stdio and streamable HTTP) exposes governed tools. `GovernedMCPClient` governs *consumed* tools: allowlist (`ExternalToolMapping`), capability mapping, optional schema-digest pinning (`schema_digest`), local argument validation (`ExternalArgs`), untrusted output (`ExternalOutput`); `Discovery` reports what was registered, blocked or missing, and `ExternalToolError` a failed call |
+| `keelgate.adapters.a2a` | `a2a` | `build_agent_card`, `build_a2a_app`, `GovernedA2AExecutor`, `loop_task_runner`, `TaskRequest` / `TaskResult`, `make_intake_tool` / `INTAKE_TOOL` / `IntakeIn` / `IntakeOut`. Task intake is a governed PROPOSE tool (`a2a_task_intake`, capability `a2a:task_submit`); remote text is untrusted and never becomes the goal |
+| `keelgate.adapters.temporal` | `temporal` | `KeelgateLoopWorkflow`, `TemporalRunner`, `build_worker`, `LoopActivities`, `WorkflowOptions`, `ACTIVITY_NAME`, `DEFAULT_TASK_QUEUE`: the loop as a Temporal activity |
 
 ### `keelgate.telemetry`
 
@@ -215,6 +294,8 @@ through the same path: **registry, grant, policy, approvals, audit**
 | `InstrumentedLLM(client)` | wrapper | Each `complete` call becomes a GenAI `chat` span with tokens and cost |
 | `CostTracker`, `CostTotals` | cost | Per-tenant, per-agent tokens and dollars, plus OTel metrics. An unpriced model adds tokens, not dollars |
 | `Redactor`, `RedactingSpanProcessor` | redaction | Exporters receive a redacted copy of each span. Pattern-based; see the security model |
+| `RunContext`, `current_run()` | context | The tenant, agent and run bound by the surrounding loop; `None` outside a run |
+| `RunSpan`, `set_attributes`, `redact_span`, `UNATTRIBUTED`, `attributes` | helpers | The loop's root span and its ids; set span attributes safely; redact one finished span; the cost bucket for calls outside a run; the attribute-name constants (provisional) |
 
 One trace per loop run: the run's `trace_id` is its OpenTelemetry trace id, and a resumed run
 continues the same trace. Spans never carry tool arguments, tool output, prompts or exception
@@ -240,6 +321,7 @@ messages. See [ADR-0005](adr/0005-telemetry-replay-and-evals.md).
 | `EvalReport`, `SuiteResult`, `CaseResult`, `EvalContext` | types | `report.passed` is false on any failing case or regression |
 | `to_dict`, `to_html`, `to_markdown`, `baseline_of`, `compare` | reports | JSON, a self-contained HTML page, a CI summary, and baseline comparison |
 | `keelgate eval run / list`, `keelgate replay` | CLI | Exit 0 passed, 1 failed or regressed, 2 usage error |
+| `load_records`, `sample_records`, `run_metrics`, `run_outcome`, `LoadedMetric`, `AccuracyMetric`, `SUITES`, `EvalStack`, `write_json`, `write_html`, `write_markdown` | helpers | Read outcome records from JSON lines; run the metrics over them; the built-in accuracy metric; the suite names; the isolated stack the red-team cases run against; write a report to disk. All provisional |
 
 The red-team case ids (`TI-01`, `CE-06`, ...) are used by baselines. Adding cases is a minor
 change; renaming or removing one makes a baseline report it as missing.
@@ -269,12 +351,26 @@ change without a major bump.
 | `keelgate[mcp]` | MCP server and governed MCP client |
 | `keelgate[a2a]` | A2A agent card and task intake |
 | `keelgate[temporal]` | Temporal durable-execution adapter |
+| `keelgate[otlp]` | OTLP/HTTP trace export (Jaeger, Phoenix) |
 | `keelgate[cedar]` | `CedarEngine` |
 | `keelgate[server]` | FastAPI approvals API, Postgres audit store, Redis |
 
 Ollama and vLLM need no extra (plain `httpx`; vLLM reuses the OpenAI wire format
-through `keelgate[openai]`). Adapter modules (`keelgate.adapters.*`) are part of
-the contract only in that they exist and import.
+through `keelgate[openai]`). Every adapter symbol is in the [API contract](api-contract.md) and is
+marked provisional, because the framework each one wraps is still moving.
+
+## End to end: using Keelgate from another library
+
+A downstream library brings its own **tools**, its own **policy**, its own **metric**, and a small
+**harness** that wires them into a governed, budgeted, resumable, replayable agent. This is the
+whole of it, importing only the public API. It is
+[`examples/use_keelgate_from_another_library.py`][ex], run by the contract tests on every change.
+
+[ex]: https://github.com/anilatambharii/keelgate/blob/main/examples/use_keelgate_from_another_library.py
+
+```python
+--8<-- "examples/use_keelgate_from_another_library.py"
+```
 
 ## Guarantees that outlive any signature
 

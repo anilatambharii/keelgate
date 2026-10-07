@@ -41,8 +41,20 @@ theme:
 
 plugins:
   - search
-  # mkdocstrings is installed in the `docs` dependency group and gets enabled
-  # here once there is a public API to generate a reference from.
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [src]
+          options:
+            docstring_style: google
+            show_source: false
+            show_signature_annotations: true
+            separate_signature: true
+            members_order: alphabetical
+            heading_level: 2
+            show_symbol_type_heading: true
+            show_if_no_docstring: false
+            inherited_members: false
 
 markdown_extensions:
   - abbr
@@ -58,7 +70,9 @@ markdown_extensions:
   - pymdownx.highlight:
       anchor_linenums: true
   - pymdownx.inlinehilite
-  - pymdownx.snippets
+  - pymdownx.snippets:
+      base_path: ["."]
+      check_paths: true
   - pymdownx.tabbed:
       alternate_style: true
   - pymdownx.superfences:
@@ -69,9 +83,45 @@ markdown_extensions:
 
 nav:
   - Home: index.md
-  - Integration contract: integration-contract.md
+  - Concepts: concepts.md
+  - Tutorial: tutorial.md
+  - Guides:
+      - Governed LangGraph agent: guides/langgraph.md
+      - MCP server for Claude Desktop and Cursor: guides/mcp-clients.md
+      - Write your own policy pack: guides/custom-policy-pack.md
+      - Telemetry, replay and evals: telemetry-and-evals.md
   - Security model: security-model.md
-  - Telemetry, replay and evals: telemetry-and-evals.md
+  - Reference:
+      - API reference:
+          - Overview: reference/index.md
+          - "keelgate.tools": reference/tools.md
+          - "keelgate.capabilities": reference/capabilities.md
+          - "keelgate.policy": reference/policy.md
+          - "keelgate.audit": reference/audit.md
+          - "keelgate.approvals": reference/approvals.md
+          - "keelgate.loop": reference/loop.md
+          - "keelgate.context": reference/context.md
+          - "keelgate.memory": reference/memory.md
+          - "keelgate.llm": reference/llm.md
+          - "keelgate.telemetry": reference/telemetry.md
+          - "keelgate.evals": reference/evals.md
+          - "keelgate.testing": reference/testing.md
+          - "keelgate.adapters": reference/adapters.md
+          - "keelgate.llm.providers": reference/llm-providers.md
+          - "keelgate.adapters.mcp": reference/adapters-mcp.md
+          - "keelgate.adapters.langgraph": reference/adapters-langgraph.md
+          - "keelgate.adapters.openai_agents": reference/adapters-openai_agents.md
+          - "keelgate.adapters.claude_agent_sdk": reference/adapters-claude_agent_sdk.md
+          - "keelgate.adapters.a2a": reference/adapters-a2a.md
+          - "keelgate.adapters.temporal": reference/adapters-temporal.md
+          - Public modules: reference/modules.md
+      - API contract: api-contract.md
+      - Integration contract: integration-contract.md
+  - Project:
+      - Versioning and deprecation: versioning.md
+      - Migrating to 0.2: migrating-to-0.2.md
+      - Releasing: releasing.md
+      - Changelog: changelog.md
   - Decisions:
       - "ADR-0001 Licensing and open core": adr/0001-licensing-and-open-core.md
       - "ADR-0002 Policy engine": adr/0002-policy-engine.md
@@ -81,3 +131,5 @@ nav:
 
 watch:
   - docs
+  - src
+  - examples

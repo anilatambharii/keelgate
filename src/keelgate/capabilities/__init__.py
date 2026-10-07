@@ -1,6 +1,6 @@
 """Capability definitions and scoped, explicitly issued grants. Deny by default."""
 
-from keelgate.capabilities.capability import (
+from keelgate.capabilities._capability import (
     MARKET_DATA_READ,
     REPORT_WRITE,
     TRADE_PAPER_EXECUTE,
@@ -8,7 +8,7 @@ from keelgate.capabilities.capability import (
     Capability,
     InvalidCapabilityError,
 )
-from keelgate.capabilities.errors import (
+from keelgate.capabilities._errors import (
     GrantError,
     GrantExpiredError,
     GrantInvalidError,
@@ -16,7 +16,7 @@ from keelgate.capabilities.errors import (
     GrantRevokedError,
     UnknownKeyError,
 )
-from keelgate.capabilities.grants import (
+from keelgate.capabilities._grants import (
     DEFAULT_MAX_TTL,
     Budget,
     BudgetLedger,
@@ -29,7 +29,7 @@ from keelgate.capabilities.grants import (
     SignedGrant,
     issue_grant,
 )
-from keelgate.capabilities.stores import SqliteBudgetLedger, SqliteRevocationList
+from keelgate.capabilities._stores import SqliteBudgetLedger, SqliteRevocationList
 
 __all__ = [
     "DEFAULT_MAX_TTL",

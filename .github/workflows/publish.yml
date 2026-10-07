@@ -79,3 +79,25 @@ jobs:
           name: dist
           path: dist/
       - uses: pypa/gh-action-pypi-publish@release/v1
+
+  verify:
+    # The acceptance test of a release: what a stranger gets from `pip install`, in a clean
+    # environment, runs the quickstart. PyPI's index can lag a minute behind the upload, so retry.
+    name: verify the published release
+    needs: pypi
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install from PyPI in a clean venv and run the quickstart
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          python -m venv /tmp/clean
+          for attempt in 1 2 3 4 5 6 7 8 9 10; do
+            if /tmp/clean/bin/pip install --no-cache-dir "keelgate==${version}"; then break; fi
+            echo "not on the index yet (attempt ${attempt}); waiting"; sleep 30
+          done
+          /tmp/clean/bin/python -c "import keelgate; assert keelgate.__version__ == '${version}', keelgate.__version__; print('keelgate', keelgate.__version__)"
+          /tmp/clean/bin/keelgate quickstart --tamper
+          /tmp/clean/bin/keelgate eval run --suite redteam --out /tmp/eval

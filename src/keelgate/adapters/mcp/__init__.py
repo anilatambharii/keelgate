@@ -5,7 +5,7 @@ into a registry, under an allowlist, with :class:`GovernedMCPClient`.
 """
 
 try:
-    from keelgate.adapters.mcp.client import (
+    from keelgate.adapters.mcp._client import (
         Discovery,
         ExternalArgs,
         ExternalOutput,
@@ -14,7 +14,7 @@ try:
         GovernedMCPClient,
         schema_digest,
     )
-    from keelgate.adapters.mcp.server import GovernedMCPServer
+    from keelgate.adapters.mcp._server import GovernedMCPServer
 except ImportError as exc:  # pragma: no cover - depends on the extra
     raise ImportError(
         "keelgate.adapters.mcp needs the MCP SDK: pip install 'keelgate[mcp]'"

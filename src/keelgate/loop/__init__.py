@@ -1,6 +1,6 @@
 """Durable, budgeted agent loop with explicit stop conditions and resume."""
 
-from keelgate.loop.checkpoint import (
+from keelgate.loop._checkpoint import (
     CheckpointStore,
     HistoryCheckpointStore,
     InMemoryCheckpointStore,
@@ -8,7 +8,7 @@ from keelgate.loop.checkpoint import (
     StaleCheckpointError,
     default_checkpointer,
 )
-from keelgate.loop.engine import (
+from keelgate.loop._engine import (
     DEFAULT_SYSTEM_PROMPT,
     ContextSource,
     Loop,
@@ -17,14 +17,14 @@ from keelgate.loop.engine import (
     RunExistsError,
     RunNotFoundError,
 )
-from keelgate.loop.kinds import (
+from keelgate.loop._kinds import (
     READ_ONLY,
     MonitorLoop,
     MonitorSummary,
     Schedule,
     VerificationLoop,
 )
-from keelgate.loop.replay import (
+from keelgate.loop._replay import (
     Divergence,
     NotReplayableError,
     RecordedAction,
@@ -35,7 +35,7 @@ from keelgate.loop.replay import (
     find_run,
     replay,
 )
-from keelgate.loop.roles import (
+from keelgate.loop._roles import (
     AcceptAllVerifier,
     CallableVerifier,
     GroundedAnswerVerifier,
@@ -50,8 +50,8 @@ from keelgate.loop.roles import (
     Verifier,
     VerifyRequest,
 )
-from keelgate.loop.runner import InProcessRunner, LoopOutcome, LoopRunner, LoopSpec
-from keelgate.loop.state import (
+from keelgate.loop._runner import InProcessRunner, LoopOutcome, LoopRunner, LoopSpec
+from keelgate.loop._state import (
     ActionOutcome,
     ActionStatus,
     LoopState,
@@ -60,7 +60,7 @@ from keelgate.loop.state import (
     PlannedAction,
     StopReason,
 )
-from keelgate.loop.stop import GoalPredicate, StopConditions
+from keelgate.loop._stop import GoalPredicate, StopConditions
 
 __all__ = [
     "DEFAULT_SYSTEM_PROMPT",

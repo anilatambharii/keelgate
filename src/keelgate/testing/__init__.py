@@ -4,13 +4,13 @@ Importing this package never imports pytest. The fixtures live in ``keelgate.tes
 which pytest loads through an entry point.
 """
 
-from keelgate.testing.fake_llm import (
+from keelgate.testing._fake_llm import (
     FakeLLM,
     Reply,
     ScriptExhaustedError,
     UnofferedToolError,
 )
-from keelgate.testing.harness import (
+from keelgate.testing._harness import (
     GovernedHarness,
     ManualClock,
     StaticPolicyEngine,

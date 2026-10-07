@@ -76,7 +76,13 @@ allowed or blocked, is appended to the audit chain.
 
 ```bash
 pip install keelgate
+keelgate quickstart            # 20 seconds: a gate that allows, denies and asks a human
 ```
+
+New here? Start with the [10-minute tutorial](https://anilatambharii.github.io/keelgate/tutorial/)
+and the [concepts](https://anilatambharii.github.io/keelgate/concepts/). The full documentation is
+at **<https://anilatambharii.github.io/keelgate/>**, and the
+[60-second demo script](docs/demo/README.md) is runnable.
 
 Optional integrations, installed only if you adapt to them:
 
@@ -177,6 +183,17 @@ Found a hole? See [SECURITY.md](SECURITY.md). Reports about prompt injection and
 policy bypass are in scope and welcome.
 
 ## Project status
+
+**Phase K4 — a published contract.** The public API is exactly what
+[`docs/api-contract.md`](docs/api-contract.md) lists: every symbol, signature and stability level,
+generated from the code and checked by tests, so an API change always shows up as a diff. Every other
+module is private (underscored). The [integration contract](docs/integration-contract.md) has the
+semantics and an end-to-end example for building on Keelgate from another library;
+[versioning](docs/versioning.md) has the semver and deprecation policy; releases are automated with
+release-please and published to PyPI by trusted publishing. Examples: a governed LangGraph agent, an
+MCP server for Claude Desktop and Cursor, and a custom policy pack.
+Upgrading from 0.1? See the [migration guide](docs/migrating-to-0.2.md); `keelgate migrate-imports`
+rewrites the old deep imports for you.
 
 **Phase K3 — traceable, replayable, testable.** On top of K2, every run is one OpenTelemetry trace
 (GenAI conventions, policy-decision spans, per-tenant cost, optional PII redaction, OTLP export),

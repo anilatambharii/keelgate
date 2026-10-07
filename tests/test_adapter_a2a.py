@@ -10,6 +10,7 @@ import pytest
 
 pytest.importorskip("a2a")
 
+from keelgate.adapters._governed import GovernedToolset
 from keelgate.adapters.a2a import (
     INTAKE_TOOL,
     TaskRequest,
@@ -18,7 +19,6 @@ from keelgate.adapters.a2a import (
     build_agent_card,
     make_intake_tool,
 )
-from keelgate.adapters.governed import GovernedToolset
 from tests.conftest import Harness, build_harness, run
 
 CAPS = ("a2a:task_submit",)

@@ -1,7 +1,7 @@
 """REST surface for the approval queue (``pip install 'keelgate[server]'``).
 
 Authentication is a static bearer-token table mapping each token to an
-:class:`~keelgate.approvals.models.Approver`. The approver's tenant comes from
+:class:`~keelgate.approvals._models.Approver`. The approver's tenant comes from
 that table, **never** from the request, so a caller cannot name another tenant.
 This is deliberately minimal: real identity (OIDC, SSO) belongs to the Cloud
 control plane and is out of scope for K1.
@@ -20,8 +20,8 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from keelgate.approvals.models import ApprovalRequest, Approver
-from keelgate.approvals.queue import (
+from keelgate.approvals._models import ApprovalRequest, Approver
+from keelgate.approvals._queue import (
     ApprovalError,
     ApprovalExpiredError,
     ApprovalNotAuthorisedError,

@@ -12,7 +12,7 @@ import pytest
 from mcp import Client, StdioServerParameters, types
 from mcp.server import Server
 
-from keelgate.adapters.governed import UNTRUSTED_KEY, GovernedToolset
+from keelgate.adapters._governed import UNTRUSTED_KEY, GovernedToolset
 from keelgate.adapters.mcp import (
     ExternalToolMapping,
     GovernedMCPClient,

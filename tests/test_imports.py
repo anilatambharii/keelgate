@@ -35,6 +35,7 @@ CONTRACT_MODULES = [
 # Implementation packages that are not part of the Tycheon contract or an adapter.
 SUBPACKAGES = [
     "keelgate.llm.providers",
+    "keelgate._internal",
 ]
 
 ADAPTER_MODULES = [
@@ -77,7 +78,7 @@ def test_no_module_in_tree_fails_to_import() -> None:
 def test_every_package_in_tree_is_declared() -> None:
     """The set of *packages* and the contract list must not drift apart.
 
-    Submodules (``keelgate.policy.engine`` and so on) are implementation detail
+    Submodules (``keelgate.policy._engine`` and so on) are implementation detail
     and free to grow; the package-level surface is the contract.
     """
     found = {

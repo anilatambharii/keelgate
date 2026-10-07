@@ -1,21 +1,21 @@
 """Tool registry and declaration, with each tool tagged by side effect."""
 
-from keelgate.tools.gateway import PAPER_MODES, CallContext, ToolGateway
-from keelgate.tools.idempotency import (
+from keelgate.tools._gateway import PAPER_MODES, CallContext, ToolGateway
+from keelgate.tools._idempotency import (
     Claim,
     ClaimState,
     IdempotencyStore,
     InMemoryIdempotencyStore,
     SqliteIdempotencyStore,
 )
-from keelgate.tools.outcomes import (
+from keelgate.tools._outcomes import (
     ErrorCode,
     OutcomeStatus,
     ToolError,
     ToolOutcome,
     Untrusted,
 )
-from keelgate.tools.spec import (
+from keelgate.tools._spec import (
     DirectInvocationError,
     RegistryFrozenError,
     SideEffect,

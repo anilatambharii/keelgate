@@ -3,9 +3,9 @@
 Each client imports its SDK lazily, so importing this package needs no extras.
 """
 
-from keelgate.llm.providers.anthropic import AnthropicClient
-from keelgate.llm.providers.google import GoogleClient
-from keelgate.llm.providers.ollama import OllamaClient
-from keelgate.llm.providers.openai import OpenAIClient, VLLMClient
+from keelgate.llm.providers._anthropic import AnthropicClient
+from keelgate.llm.providers._google import GoogleClient
+from keelgate.llm.providers._ollama import OllamaClient
+from keelgate.llm.providers._openai import OpenAIClient, VLLMClient
 
 __all__ = ["AnthropicClient", "GoogleClient", "OllamaClient", "OpenAIClient", "VLLMClient"]

@@ -7,6 +7,7 @@ import os
 from collections.abc import Callable, Coroutine
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from typing import Any, TypeVar
 
 import pytest
@@ -25,6 +26,8 @@ from keelgate.tools import (
 )
 
 T = TypeVar("T")
+
+ROOT_DIR = Path(__file__).resolve().parents[1]
 
 # Keelgate's own fixtures, loaded here rather than through the pytest11 entry point (see addopts).
 pytest_plugins = ["keelgate.testing.plugin"]

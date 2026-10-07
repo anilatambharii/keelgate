@@ -30,15 +30,15 @@ from typing import TYPE_CHECKING, Any
 
 import cedarpy
 
-from keelgate.approvals.tiers import ApprovalTier
-from keelgate.policy.engine import deny, hash_sources
-from keelgate.policy.types import Decision, PolicyDecision
+from keelgate.approvals._tiers import ApprovalTier
+from keelgate.policy._engine import deny, hash_sources
+from keelgate.policy._types import Decision, PolicyDecision
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
     from pathlib import Path
 
-    from keelgate.policy.types import PolicyInput
+    from keelgate.policy._types import PolicyInput
 
 ACTION_INVOKE = "invoke"
 ACTION_EXPLICIT = "explicit_signoff"
@@ -61,6 +61,12 @@ def load_cedar_sources(directory: Path) -> dict[str, str]:
 
 
 class CedarEngine:
+    """Cedar policy engine (extra ``keelgate[cedar]``) implementing a documented subset of
+    ``finance_basic``.
+
+    Fails closed, including on any evaluation error.
+    """
+
     name = "cedar"
 
     def __init__(self, pack_dir: Path) -> None:

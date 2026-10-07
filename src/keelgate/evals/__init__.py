@@ -8,8 +8,8 @@
 Run them with ``keelgate eval run`` (or ``make eval``).
 """
 
-from keelgate.evals.context import EvalContext
-from keelgate.evals.metrics import (
+from keelgate.evals._context import EvalContext
+from keelgate.evals._metrics import (
     ENTRY_POINT_GROUP,
     AccuracyMetric,
     LoadedMetric,
@@ -20,7 +20,7 @@ from keelgate.evals.metrics import (
     run_metrics,
     sample_records,
 )
-from keelgate.evals.report import (
+from keelgate.evals._report import (
     baseline_of,
     compare,
     to_dict,
@@ -30,9 +30,9 @@ from keelgate.evals.report import (
     write_json,
     write_markdown,
 )
-from keelgate.evals.runner import SUITES, run_outcome, run_suite, run_suites
-from keelgate.evals.stack import EvalStack
-from keelgate.evals.types import CaseResult, EvalReport, MetricResult, SuiteResult
+from keelgate.evals._runner import SUITES, run_outcome, run_suite, run_suites
+from keelgate.evals._stack import EvalStack
+from keelgate.evals._types import CaseResult, EvalReport, MetricResult, SuiteResult
 
 __all__ = [
     "ENTRY_POINT_GROUP",

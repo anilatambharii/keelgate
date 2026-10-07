@@ -18,7 +18,7 @@ from keelgate.testing import (
     build_governed_harness,
 )
 from keelgate.tools import SideEffect, tool
-from keelgate.tools.outcomes import OutcomeStatus
+from keelgate.tools._outcomes import OutcomeStatus
 from tests.conftest import run
 
 

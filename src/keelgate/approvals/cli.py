@@ -18,9 +18,9 @@ import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from keelgate.approvals.models import ApprovalRequest, Approver, sanitize_for_display
-from keelgate.approvals.queue import ApprovalError, ApprovalQueue
-from keelgate.approvals.tiers import ApprovalTier
+from keelgate.approvals._models import ApprovalRequest, Approver, sanitize_for_display
+from keelgate.approvals._queue import ApprovalError, ApprovalQueue
+from keelgate.approvals._tiers import ApprovalTier
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -82,6 +82,7 @@ def _parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    """Run the ``keelgate-approvals`` command line (list, show, approve, reject)."""
     args = _parser().parse_args(argv)
     if args.db != ":memory:":
         Path(args.db).expanduser().parent.mkdir(parents=True, exist_ok=True)

@@ -1,7 +1,7 @@
 """Model-agnostic LLM client boundary. Provider logic stays inside ``keelgate.llm``."""
 
-from keelgate.llm.pricing import ModelPrice, PricingTable
-from keelgate.llm.types import (
+from keelgate.llm._pricing import ModelPrice, PricingTable
+from keelgate.llm._types import (
     FinishReason,
     LLMAuthError,
     LLMClient,
