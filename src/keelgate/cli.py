@@ -199,6 +199,7 @@ def _replay(args: argparse.Namespace) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
+    """Build the ``keelgate`` argument parser."""
     parser = argparse.ArgumentParser(prog="keelgate", description="Keelgate command line")
     sub = parser.add_subparsers(dest="command", required=True)
 
@@ -240,6 +241,9 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    """Run the ``keelgate`` command line and return the exit code (0 passed, 1 failed, 2 usage
+    error).
+    """
     parser = build_parser()
     args = parser.parse_args(argv)
     return int(args.handler(args))

@@ -67,6 +67,8 @@ class AccuracyMetric:
 
 @dataclass(frozen=True)
 class LoadedMetric:
+    """An outcome metric found through the entry-point group, or why it failed to load."""
+
     entry_point: str
     metric: OutcomeMetric | None
     error: str = ""

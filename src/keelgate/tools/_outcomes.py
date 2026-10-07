@@ -86,6 +86,12 @@ class Untrusted(Generic[T]):
 
 @dataclass(frozen=True)
 class ToolOutcome:
+    """The structured result of one gateway call.
+
+    A status, the (untrusted) output or a model-actionable error, and for a parked call the approval
+    to wait for.
+    """
+
     status: OutcomeStatus
     tool: str
     call_id: str

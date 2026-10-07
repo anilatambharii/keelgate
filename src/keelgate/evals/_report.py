@@ -18,6 +18,7 @@ EPSILON: Final = 1e-9
 
 
 def to_dict(report: EvalReport) -> dict[str, Any]:
+    """The report as a JSON-serialisable dict."""
     return {
         "keelgate_version": report.version,
         "generated_at": report.generated_at,
@@ -73,6 +74,7 @@ def _case(c: CaseResult) -> dict[str, Any]:
 
 
 def write_json(report: EvalReport, path: Path) -> None:
+    """Write the report as JSON to ``path``."""
     path.write_text(
         json.dumps(to_dict(report), indent=2, sort_keys=True, default=str) + "\n", "utf-8"
     )
@@ -135,6 +137,7 @@ def _suite_html(s: SuiteResult) -> str:
 
 
 def to_html(report: EvalReport) -> str:
+    """The report as one self-contained HTML page (no external resources; everything escaped)."""
     banner_class = "ok" if report.passed else "bad"
     headline = (
         "All checks passed."
@@ -199,10 +202,12 @@ def to_markdown(report: EvalReport) -> str:
 
 
 def write_markdown(report: EvalReport, path: Path) -> None:
+    """Write a short Markdown summary of the report to ``path`` (for a CI job page)."""
     path.write_text(to_markdown(report), "utf-8")
 
 
 def write_html(report: EvalReport, path: Path) -> None:
+    """Write the report as a self-contained HTML page to ``path``."""
     path.write_text(to_html(report), "utf-8")
 
 

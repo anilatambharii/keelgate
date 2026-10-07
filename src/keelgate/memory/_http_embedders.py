@@ -66,6 +66,10 @@ class _HttpEmbedder:
 
 
 class OllamaEmbedder(_HttpEmbedder):
+    """Embeds text with a local Ollama server (``/api/embed``). The vector size is checked on every
+    response.
+    """
+
     def __init__(
         self,
         *,
@@ -88,6 +92,11 @@ class OllamaEmbedder(_HttpEmbedder):
 
 
 class OpenAICompatibleEmbedder(_HttpEmbedder):
+    """Embeds text with OpenAI or any server speaking the OpenAI ``/embeddings`` format.
+
+    Covers vLLM and LM Studio. The vector size is checked on every response.
+    """
+
     def __init__(
         self,
         *,

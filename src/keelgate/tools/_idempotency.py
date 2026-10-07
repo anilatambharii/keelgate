@@ -37,6 +37,12 @@ class ClaimState(StrEnum):
 
 @dataclass(frozen=True)
 class Claim:
+    """The outcome of claiming an idempotency key.
+
+    ``state`` says whether the caller may run the call, must replay the stored ``output``, or is
+    looking at a call that is still in flight or of unknown outcome.
+    """
+
     state: ClaimState
     output: dict[str, Any] | None = None
 
@@ -61,6 +67,12 @@ class _Entry:
 
 
 class InMemoryIdempotencyStore:
+    """Process-local idempotency store.
+
+    Fine for tests and single-process use. It is lost on restart, so use ``SqliteIdempotencyStore``
+    (or your own ``IdempotencyStore``) when a WRITE must never run twice across restarts.
+    """
+
     def __init__(self) -> None:
         self._entries: dict[tuple[str, str, str], _Entry] = {}
         self._lock = threading.Lock()

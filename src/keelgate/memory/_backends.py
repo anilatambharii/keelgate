@@ -156,6 +156,11 @@ WHERE tenant_id = ? AND tier = ? AND recorded_at <= ?
 
 
 class SqliteMemoryBackend:
+    """SQLite storage for memory: append-only, bitemporal, tenant-scoped, with exact vector search.
+
+    Good for local use and tests.
+    """
+
     def __init__(self, path: str | Path = ":memory:") -> None:
         self._conn = sqlite3.connect(str(path), check_same_thread=False, isolation_level=None)
         if str(path) != ":memory:":

@@ -86,12 +86,23 @@ class Rejection:
 
 @dataclass(frozen=True)
 class Compaction:
+    """A record that several context items were replaced by one summary item.
+
+    The summary points back to the full records.
+    """
+
     summary_id: str
     source_ids: tuple[str, ...]
 
 
 @dataclass(frozen=True)
 class BuiltContext:
+    """The result of building a context.
+
+    The messages to send, the admitted items, token use against the budget, what was compacted or
+    dropped, and what was rejected.
+    """
+
     messages: tuple[Message, ...]
     items: tuple[ContextItem, ...]
     tokens: int
@@ -114,6 +125,12 @@ def _fence(item: ContextItem) -> str:
 
 
 class ContextBuilder:
+    """Assembles a prompt for a given ``as_of``.
+
+    Rejects anything published after it, labels outside text untrusted and fences it, and compacts
+    over-budget context into summaries that point to the full records.
+    """
+
     def __init__(
         self,
         *,

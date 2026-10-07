@@ -76,6 +76,7 @@ _active: Telemetry = _DEFAULT
 
 
 def active() -> Telemetry:
+    """The currently active ``Telemetry`` handle."""
     return _active
 
 
@@ -101,6 +102,8 @@ def use(telemetry: Telemetry) -> Iterator[Telemetry]:
 
 @dataclass(frozen=True)
 class RunContext:
+    """The tenant, agent and run that spans and costs created inside a block are attributed to."""
+
     tenant_id: str
     agent_id: str
     run_id: str
@@ -110,6 +113,7 @@ _run: ContextVar[RunContext | None] = ContextVar("keelgate_run", default=None)
 
 
 def current_run() -> RunContext | None:
+    """The ``RunContext`` bound by the surrounding loop, or None outside a run."""
     return _run.get()
 
 
@@ -176,5 +180,6 @@ def span(
 
 
 def set_attributes(span_: Span, attributes: Mapping[str, Any]) -> None:
+    """Set several span attributes at once, dropping ``None`` values and truncating long strings."""
     for key, value in clean(attributes).items():
         span_.set_attribute(key, value)

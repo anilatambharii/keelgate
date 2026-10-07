@@ -19,6 +19,7 @@ from keelgate.llm._types import LLMClient, LLMRequest, Message, Role, ToolCall, 
 
 
 def to_keelgate_messages(messages: list[BaseMessage]) -> tuple[Message, ...]:
+    """Convert LangChain messages into Keelgate ``Message`` objects."""
     converted: list[Message] = []
     for m in messages:
         content = m.content if isinstance(m.content, str) else str(m.content)

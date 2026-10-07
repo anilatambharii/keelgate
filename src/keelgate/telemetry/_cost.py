@@ -27,6 +27,10 @@ UNATTRIBUTED: Final = "unattributed"
 
 @dataclass(frozen=True)
 class CostTotals:
+    """Calls, tokens and dollars for one tenant/agent selection. Unpriced calls add tokens but no
+    dollars.
+    """
+
     calls: int = 0
     input_tokens: int = 0
     output_tokens: int = 0
@@ -39,6 +43,11 @@ class CostTotals:
 
 
 class CostTracker:
+    """Per-tenant and per-agent token and dollar totals, also emitted as OpenTelemetry metrics.
+
+    Never invents a price.
+    """
+
     def __init__(self, meter: Meter | None = None) -> None:
         self._lock = threading.Lock()
         self._totals: dict[tuple[str, str, str], CostTotals] = {}

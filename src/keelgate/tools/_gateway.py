@@ -126,6 +126,13 @@ class _State:
 
 
 class ToolGateway:
+    """The single choke point every tool call passes through.
+
+    Grant, tenant, tool, capability, side-effect ceiling, paper-only mode, argument validation,
+    budget, idempotency, policy, approval, then execution. A refusal is returned as a result, never
+    raised, and the audit record is written before any side effect.
+    """
+
     def __init__(
         self,
         *,

@@ -138,6 +138,11 @@ class ContextSource(Protocol):
 
 @dataclass(frozen=True)
 class LoopResult:
+    """What a ``Loop`` run or resume returns.
+
+    The final state, why it stopped, whether it reached the goal and whether it can be resumed.
+    """
+
     state: LoopState
 
     @property
@@ -173,6 +178,12 @@ def _status(action: PlannedAction) -> ActionStatus:
 
 
 class Loop:
+    """The durable agent loop: plan, act, observe, verify, then revise or stop.
+
+    Checkpoints every step, honours the stop conditions, and resumes without re-planning or
+    repeating a completed WRITE.
+    """
+
     def __init__(
         self,
         *,

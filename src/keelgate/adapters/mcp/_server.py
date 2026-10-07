@@ -44,6 +44,11 @@ _INTERNAL = json.dumps(
 
 
 class GovernedMCPServer:
+    """Serve governed tools as an MCP server over stdio or streamable HTTP.
+
+    Every call goes through the gateway, handlers never raise, and output is labelled untrusted.
+    """
+
     def __init__(
         self,
         toolset: GovernedToolset,

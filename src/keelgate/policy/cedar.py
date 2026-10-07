@@ -61,6 +61,12 @@ def load_cedar_sources(directory: Path) -> dict[str, str]:
 
 
 class CedarEngine:
+    """Cedar policy engine (extra ``keelgate[cedar]``) implementing a documented subset of
+    ``finance_basic``.
+
+    Fails closed, including on any evaluation error.
+    """
+
     name = "cedar"
 
     def __init__(self, pack_dir: Path) -> None:

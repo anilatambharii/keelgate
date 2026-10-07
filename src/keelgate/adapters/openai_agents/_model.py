@@ -45,6 +45,7 @@ def _text_of(content: Any) -> str:
 def to_keelgate_messages(
     system_instructions: str | None, items: str | Sequence[Any]
 ) -> tuple[Message, ...]:
+    """Convert Agents SDK input items into Keelgate ``Message`` objects."""
     messages: list[Message] = []
     if system_instructions:
         messages.append(Message(role=Role.SYSTEM, content=system_instructions))

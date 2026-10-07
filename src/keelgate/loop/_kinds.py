@@ -67,6 +67,8 @@ class VerificationLoop(Loop):
 
 @dataclass(frozen=True)
 class Schedule:
+    """A fixed interval between monitoring ticks."""
+
     interval: timedelta
 
     def __post_init__(self) -> None:
@@ -79,6 +81,8 @@ class Schedule:
 
 @dataclass(frozen=True)
 class MonitorSummary:
+    """The outcome of a bounded monitoring session: how many ticks ran and each tick's result."""
+
     ticks_run: int
     results: tuple[LoopResult, ...]
 

@@ -76,6 +76,8 @@ class ReplayExhaustedError(LLMError):
 
 @dataclass(frozen=True)
 class RecordedAction:
+    """One tool call as recorded in a run: name, arguments, final status and outcome."""
+
     tool: str
     arguments: dict[str, Any]
     rationale: str
@@ -85,6 +87,10 @@ class RecordedAction:
 
 @dataclass(frozen=True)
 class RecordedStep:
+    """One iteration of a recorded run: the actions proposed, the final answer if any and the
+    verdict.
+    """
+
     iteration: int
     actions: tuple[RecordedAction, ...]
     final_answer: str | None
@@ -93,6 +99,11 @@ class RecordedStep:
 
 @dataclass(frozen=True)
 class Recording:
+    """A run rebuilt from its checkpoint history, ready to replay.
+
+    Find one by trace id with ``Recording.from_store``.
+    """
+
     tenant_id: str
     run_id: str
     trace_id: str
@@ -332,6 +343,10 @@ def _to_outcome(tool: str, recorded: RecordedAction) -> ToolOutcome:
 
 @dataclass(frozen=True)
 class Divergence:
+    """One difference between a recorded run and its replay: where, what was expected and what was
+    seen.
+    """
+
     where: str
     expected: Any
     actual: Any
@@ -339,6 +354,11 @@ class Divergence:
 
 @dataclass(frozen=True)
 class ReplayReport:
+    """The result of a replay: the original and replayed recordings and every divergence.
+
+    ``identical`` is true when there is none.
+    """
+
     original: Recording
     replayed: Recording
     divergences: tuple[Divergence, ...] = field(default_factory=tuple)
@@ -350,6 +370,7 @@ class ReplayReport:
 
 
 def diff(original: Recording, replayed: Recording) -> list[Divergence]:
+    """Compare two recordings step by step and return every divergence (empty when they match)."""
     out: list[Divergence] = []
     if len(original.steps) != len(replayed.steps):
         out.append(Divergence("steps", len(original.steps), len(replayed.steps)))

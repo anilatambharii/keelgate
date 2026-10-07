@@ -93,6 +93,12 @@ CREATE INDEX IF NOT EXISTS approvals_tenant_status ON approvals (tenant_id, stat
 
 
 class ApprovalQueue:
+    """The human-in-the-loop approval queue (SQLite-backed).
+
+    Requests are submitted with an evidence bundle, decided by a human of sufficient tier (never the
+    requester), and spent exactly once for exactly the arguments that were approved.
+    """
+
     def __init__(
         self,
         path: str | Path = ":memory:",

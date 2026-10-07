@@ -24,6 +24,11 @@ DEFAULT_DECISION_PATH = "keelgate/finance_basic/decision"
 
 
 class OpaHttpEngine:
+    """Policy engine that asks an OPA server over HTTP (the production default).
+
+    Fails closed: any error, timeout or malformed answer is a DENY.
+    """
+
     name = "opa-http"
 
     def __init__(

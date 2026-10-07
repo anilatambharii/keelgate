@@ -83,6 +83,11 @@ class WorkflowOptions:
 
 @workflow.defn(name=WORKFLOW_NAME)
 class KeelgateLoopWorkflow:
+    """A Temporal workflow that runs one loop as an activity.
+
+    A retried attempt resumes from the loop's checkpoint rather than starting over.
+    """
+
     @workflow.run
     async def run(self, spec: LoopSpec) -> LoopOutcome:
         options = WorkflowOptions()

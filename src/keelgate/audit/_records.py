@@ -163,6 +163,12 @@ class ChainHead:
 
 @dataclass(frozen=True)
 class ChainVerification:
+    """The result of verifying one tenant's audit chain.
+
+    Whether it is intact, how many records were checked, the head, and where it broke if it did.
+    Truthy when the chain is intact.
+    """
+
     ok: bool
     tenant_id: str
     records_checked: int

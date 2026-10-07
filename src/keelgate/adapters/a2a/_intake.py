@@ -84,6 +84,8 @@ class TaskRequest:
 
 @dataclass(frozen=True)
 class TaskResult:
+    """What a task runner returns for an A2A task: the text to report and whether it succeeded."""
+
     text: str
     ok: bool = True
 

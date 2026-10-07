@@ -25,6 +25,11 @@ if TYPE_CHECKING:
 
 @dataclass(frozen=True)
 class PlanRequest:
+    """What the planner is given for one planning call.
+
+    The run, the iteration, the built context messages and the tools it may propose.
+    """
+
     run_id: str
     tenant_id: str
     iteration: int
@@ -35,6 +40,11 @@ class PlanRequest:
 
 @dataclass(frozen=True)
 class ProposedAction:
+    """One tool call the planner proposes: a tool name, untrusted arguments and a rationale.
+
+    A proposal only; the gateway decides.
+    """
+
     tool: str
     arguments: dict[str, Any] = field(default_factory=dict)
     rationale: str = ""
@@ -120,6 +130,12 @@ class VerdictDecision(StrEnum):
 
 @dataclass(frozen=True)
 class Verdict:
+    """A verifier's judgement of a proposed final answer.
+
+    Accept, revise or reject, with reasons and flags. It steers the loop but can never authorise an
+    action.
+    """
+
     decision: VerdictDecision
     reasons: tuple[str, ...] = ()
     flags: tuple[str, ...] = ()
@@ -140,6 +156,11 @@ class Verdict:
 
 @dataclass(frozen=True)
 class VerifyRequest:
+    """What the verifier is given.
+
+    The goal, the proposed answer, the actions taken this step and the (untrusted) observations.
+    """
+
     run_id: str
     tenant_id: str
     iteration: int

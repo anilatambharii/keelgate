@@ -34,6 +34,11 @@ DEFAULT_QUERY = "data.keelgate.finance_basic.decision"
 
 
 class RegoEngine:
+    """Policy engine that evaluates the same Rego packs in-process.
+
+    For tests, the quickstart and single-process use; production should use OPA. Fails closed.
+    """
+
     name = "rego-inprocess"
 
     def __init__(self, pack_dir: Path | None = None, *, query: str = DEFAULT_QUERY) -> None:

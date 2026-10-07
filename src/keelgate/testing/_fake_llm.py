@@ -82,6 +82,12 @@ def _tokens(text: str) -> int:
 
 
 class FakeLLM:
+    """A scripted, deterministic ``LLMClient`` for tests.
+
+    Replies come from a script, in order or indexed by call number (so a restarted process continues
+    the script). Records every request it receives.
+    """
+
     name = "fake"
 
     def __init__(

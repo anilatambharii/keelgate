@@ -133,6 +133,10 @@ class RecordStore(Protocol):
 
 
 class InMemoryRecordStore:
+    """Process-local store of full context records, so a compacted summary can always be traced back
+    to what it replaced.
+    """
+
     def __init__(self) -> None:
         self._items: dict[str, ContextItem] = {}
         self._lock = threading.Lock()

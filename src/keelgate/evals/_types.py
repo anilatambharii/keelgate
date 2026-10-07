@@ -27,6 +27,10 @@ class CaseResult:
 
 @dataclass(frozen=True)
 class MetricResult:
+    """One metric's value over a batch of outcomes, with how many records it used and which
+    direction is better.
+    """
+
     name: str
     value: float
     n: int
@@ -37,6 +41,8 @@ class MetricResult:
 
 @dataclass
 class SuiteResult:
+    """The cases and metrics of one eval suite."""
+
     name: str
     description: str
     cases: list[CaseResult] = field(default_factory=list)
@@ -59,6 +65,11 @@ class SuiteResult:
 
 @dataclass
 class EvalReport:
+    """Everything one eval run produced: the suites, any regressions against a baseline, and notes.
+
+    ``passed`` is false on any failing case or regression.
+    """
+
     version: str
     generated_at: str
     mode: str

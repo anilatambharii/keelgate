@@ -56,6 +56,12 @@ class DirectInvocationError(RuntimeError):
 
 @dataclass(frozen=True)
 class ToolSpec:
+    """Everything the gateway knows about a tool.
+
+    Its schemas, capability, side effect, timeout, cost estimate, and the functions that derive its
+    idempotency key and the facts policy needs.
+    """
+
     name: str
     description: str
     input_model: type[BaseModel]
