@@ -17,6 +17,7 @@ from keelgate.telemetry.core import (
     use,
 )
 from keelgate.telemetry.cost import UNATTRIBUTED, CostTotals, CostTracker
+from keelgate.telemetry.hooks import RunSpan, run_span, traced
 from keelgate.telemetry.llm import InstrumentedLLM
 from keelgate.telemetry.redaction import RedactingSpanProcessor, Redactor, redact_span
 from keelgate.telemetry.setup import instrument
@@ -29,6 +30,7 @@ __all__ = [
     "RedactingSpanProcessor",
     "Redactor",
     "RunContext",
+    "RunSpan",
     "Telemetry",
     "activate",
     "active",
@@ -37,7 +39,9 @@ __all__ = [
     "current_run",
     "instrument",
     "redact_span",
+    "run_span",
     "set_attributes",
     "span",
+    "traced",
     "use",
 ]

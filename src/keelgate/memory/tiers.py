@@ -16,6 +16,8 @@ from keelgate.memory.types import (
     MemoryTier,
     RecordNotFoundError,
 )
+from keelgate.telemetry import attributes as attr
+from keelgate.telemetry.hooks import traced
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping
@@ -33,6 +35,13 @@ def _utc_now() -> datetime:
 def _overlap(query: str, text: str) -> float:
     q, t = set(_WORD.findall(query.lower())), set(_WORD.findall(text.lower()))
     return len(q & t) / len(q) if q else 0.0
+
+
+def _count(result: Any) -> dict[str, Any]:
+    """How many records an operation returned. Never their content."""
+    if isinstance(result, tuple):
+        return {attr.MEMORY_RESULTS: len(result)}
+    return {attr.MEMORY_RESULTS: 0 if result is None else 1}
 
 
 class _TierMemory:
@@ -82,6 +91,15 @@ class _TierMemory:
 
     # ------------------------------------------------------------------- writes
 
+    @traced(
+        "keelgate.memory.write",
+        pre=lambda a: {
+            attr.MEMORY_TIER: a["self"].tier.value,
+            attr.MEMORY_OP: "write",
+            attr.TENANT_ID: a["self"].tenant_id,
+        },
+        post=_count,
+    )
     def write(
         self,
         *,
@@ -122,6 +140,15 @@ class _TierMemory:
             valid_to=end,
         )
 
+    @traced(
+        "keelgate.memory.revise",
+        pre=lambda a: {
+            attr.MEMORY_TIER: a["self"].tier.value,
+            attr.MEMORY_OP: "revise",
+            attr.TENANT_ID: a["self"].tenant_id,
+        },
+        post=_count,
+    )
     def revise(
         self,
         record_id: str,
@@ -143,6 +170,15 @@ class _TierMemory:
             retired=False,
         )
 
+    @traced(
+        "keelgate.memory.retire",
+        pre=lambda a: {
+            attr.MEMORY_TIER: a["self"].tier.value,
+            attr.MEMORY_OP: "retire",
+            attr.TENANT_ID: a["self"].tenant_id,
+        },
+        post=_count,
+    )
     def retire(self, record_id: str, *, attribution: Attribution) -> MemoryRecord:
         """Hide a record from every read recorded after this moment. History is kept."""
         previous = self._require_latest(record_id)
@@ -157,6 +193,15 @@ class _TierMemory:
 
     # -------------------------------------------------------------------- reads
 
+    @traced(
+        "keelgate.memory.get",
+        pre=lambda a: {
+            attr.MEMORY_TIER: a["self"].tier.value,
+            attr.MEMORY_OP: "get",
+            attr.TENANT_ID: a["self"].tenant_id,
+        },
+        post=_count,
+    )
     def get(self, record_id: str, *, as_of: datetime) -> MemoryRecord | None:
         known = self._backend.versions(self.tenant_id, record_id, as_of=as_of)
         if not known or known[-1].tier is not self.tier:
@@ -164,12 +209,30 @@ class _TierMemory:
         latest = known[-1]
         return latest if self._visible_at(latest, as_of) else None
 
+    @traced(
+        "keelgate.memory.history",
+        pre=lambda a: {
+            attr.MEMORY_TIER: a["self"].tier.value,
+            attr.MEMORY_OP: "history",
+            attr.TENANT_ID: a["self"].tenant_id,
+        },
+        post=_count,
+    )
     def history(self, record_id: str, *, as_of: datetime) -> tuple[MemoryRecord, ...]:
         versions = self._backend.versions(self.tenant_id, record_id, as_of=as_of)
         if versions and versions[0].tier is not self.tier:
             return ()
         return tuple(versions)
 
+    @traced(
+        "keelgate.memory.search",
+        pre=lambda a: {
+            attr.MEMORY_TIER: a["self"].tier.value,
+            attr.MEMORY_OP: "search",
+            attr.TENANT_ID: a["self"].tenant_id,
+        },
+        post=_count,
+    )
     def search(self, query: str, *, as_of: datetime, limit: int = 5) -> tuple[MemoryRecord, ...]:
         if limit <= 0:
             raise ValueError("limit must be positive")
@@ -433,6 +496,15 @@ class SemanticMemory(_TierMemory):
             record_id, content=previous.content, attribution=attribution, valid_to=valid_to
         )
 
+    @traced(
+        "keelgate.memory.search",
+        pre=lambda a: {
+            attr.MEMORY_TIER: a["self"].tier.value,
+            attr.MEMORY_OP: "search",
+            attr.TENANT_ID: a["self"].tenant_id,
+        },
+        post=_count,
+    )
     def search(self, query: str, *, as_of: datetime, limit: int = 5) -> tuple[MemoryRecord, ...]:
         if limit <= 0:
             raise ValueError("limit must be positive")
@@ -440,6 +512,15 @@ class SemanticMemory(_TierMemory):
         hits = self._backend.nearest(self.tenant_id, self.tier, vector, as_of=as_of, limit=limit)
         return tuple(record for record, _score in hits)
 
+    @traced(
+        "keelgate.memory.search_scored",
+        pre=lambda a: {
+            attr.MEMORY_TIER: a["self"].tier.value,
+            attr.MEMORY_OP: "search_scored",
+            attr.TENANT_ID: a["self"].tenant_id,
+        },
+        post=_count,
+    )
     def search_scored(
         self, query: str, *, as_of: datetime, limit: int = 5
     ) -> tuple[tuple[MemoryRecord, float], ...]:

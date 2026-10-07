@@ -13,9 +13,9 @@ import keelgate
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 # Extras promised by AGENTS.md / the K0 brief.
-# K2 added google, mcp and a2a (Gemini, the MCP SDK, the A2A SDK).
+# K2 added google, mcp and a2a; K3 added otlp (the OTLP/HTTP trace exporter).
 EXPECTED_EXTRAS = {
-    "langgraph", "openai", "anthropic", "temporal", "cedar", "server", "google", "mcp", "a2a",
+    "langgraph", "openai", "anthropic", "temporal", "cedar", "server", "google", "mcp", "a2a", "otlp",
 }  # fmt: skip
 
 
