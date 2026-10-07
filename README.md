@@ -88,6 +88,7 @@ pip install "keelgate[google]"      # Gemini client
 pip install "keelgate[mcp]"         # serve governed tools over MCP; govern external MCP tools
 pip install "keelgate[a2a]"         # A2A agent card + task intake under policy
 pip install "keelgate[temporal]"    # Temporal durable-execution adapter
+pip install "keelgate[otlp]"        # export traces over OTLP/HTTP (Jaeger, Phoenix)
 pip install "keelgate[cedar]"       # Cedar policy engine
 pip install "keelgate[server]"      # FastAPI control surface, Postgres, Redis
 ```
@@ -144,6 +145,17 @@ same files), **resumes from its checkpoint** without re-planning, places its pap
 order exactly once, and then **serves the same governed tools over MCP**, where a
 restricted-symbol order is denied by policy.
 
+```bash
+make eval                             # unit, trajectory, red-team and outcome evals; fails on any miss
+uv run python examples/research_loop.py --trace    # the same run, as one trace in Jaeger (make up)
+```
+
+`make eval` runs 36 red-team cases that assume the model has been fooled and check the harness
+still blocks the harm, and writes JSON, HTML and Markdown reports. Traces carry policy-decision
+spans, tokens and cost per tenant and agent, never prompts or tool arguments. A run can be rebuilt
+from its trace id and replayed with `keelgate replay`. See
+[Telemetry, replay and evals](docs/telemetry-and-evals.md).
+
 Provider clients are contract-tested offline; `make test-live` runs opt-in smoke tests against the
 real services when you supply keys.
 
@@ -166,6 +178,12 @@ policy bypass are in scope and welcome.
 
 ## Project status
 
+**Phase K3 — traceable, replayable, testable.** On top of K2, every run is one OpenTelemetry trace
+(GenAI conventions, policy-decision spans, per-tenant cost, optional PII redaction, OTLP export),
+can be rebuilt from its trace id and replayed without side effects, and is covered by unit,
+trajectory, red-team and outcome evals with a regression gate in CI and a nightly run against real
+models. Outcome metrics plug in through the `keelgate.outcome_metrics` entry point.
+
 **Phase K2 — the long-running agent.** On top of the K1 safety core (signed
 capability grants, a single policy-gated tool gateway, OPA/Rego with the
 `finance_basic` pack, a hash-chained audit log, human approvals) there is now a
@@ -175,8 +193,7 @@ client (Anthropic, OpenAI, Google, Ollama, vLLM); adapters for LangGraph, the
 OpenAI Agents SDK, the Claude Agent SDK, MCP, A2A and Temporal; and a testing kit.
 Run `make quickstart` and `make research-loop` to see it.
 
-Not built yet: telemetry and evals
-([planned](docs/integration-contract.md#planned)). The provider clients are tested
+The provider clients are tested
 through the real vendor SDKs over a mocked transport, not against live services.
 Known limitations are listed in the [security model](docs/security-model.md#known-gaps).
 

@@ -71,11 +71,13 @@ nav:
   - Home: index.md
   - Integration contract: integration-contract.md
   - Security model: security-model.md
+  - Telemetry, replay and evals: telemetry-and-evals.md
   - Decisions:
       - "ADR-0001 Licensing and open core": adr/0001-licensing-and-open-core.md
       - "ADR-0002 Policy engine": adr/0002-policy-engine.md
       - "ADR-0003 Capability grants": adr/0003-capability-grants-paseto.md
       - "ADR-0004 Durable loop and resume": adr/0004-durable-loop-and-resume-semantics.md
+      - "ADR-0005 Telemetry, replay and evals": adr/0005-telemetry-replay-and-evals.md
 
 watch:
   - docs

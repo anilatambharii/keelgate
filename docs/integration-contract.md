@@ -4,10 +4,10 @@ This page defines the **public API** downstream projects may depend on. It is
 versioned with [semantic versioning](https://semver.org/) and is the only part of
 Keelgate that carries a stability promise.
 
-!!! info "Status after Phase K2"
-    Implemented: **tools, capabilities, policy, audit, approvals** (K1) and
-    **loop, context, memory, llm, testing** plus the framework **adapters** (K2).
-    Still *planned*: **telemetry** and **evals**. `tests/test_imports.py`
+!!! info "Status after Phase K3"
+    Every contract module is implemented: **tools, capabilities, policy, audit,
+    approvals** (K1); **loop, context, memory, llm, testing** and the framework
+    **adapters** (K2); **telemetry** and **evals** (K3). `tests/test_imports.py`
     enforces the module list; the tables below are the symbol-level
     specification.
 
@@ -38,8 +38,8 @@ say what a downstream project can lean on today and what it should expect to mov
 
 | Tier | Meaning | What is in it |
 |---|---|---|
-| **Stable** | Follows the policy above. A breaking change needs a major bump and a migration note. | The K1 safety core (`tools`, `capabilities`, `policy`, `audit`, `approvals`); `Loop`, `StopConditions`, `LoopResult`, `StopReason`, `CheckpointStore`; `ContextBuilder`, `ContextItem`; the `Memory` interface and the four tiers; the `LLMClient` protocol and its request, response and error types; `FakeLLM`; `GovernedToolset` |
-| **Provisional** | Works and is tested, but may change in a **minor** release, with a changelog entry. Pin a minor version if you depend on it. | `keelgate.llm.providers.*` (vendor SDKs move fast); `keelgate.adapters.*` (wrapped frameworks move too); memory backends and embedders; the Temporal runner; `keelgate.testing` harness and pytest fixture names; `OutcomeConfirmer`; `LoopRunner` and `LoopSpec` |
+| **Stable** | Follows the policy above. A breaking change needs a major bump and a migration note. | The K1 safety core (`tools`, `capabilities`, `policy`, `audit`, `approvals`); `Loop`, `StopConditions`, `LoopResult`, `StopReason`, `CheckpointStore`; `ContextBuilder`, `ContextItem`; the `Memory` interface and the four tiers; the `LLMClient` protocol and its request, response and error types; `FakeLLM`; `GovernedToolset`; `instrument()`, `span`, `traced`; `OutcomeMetric`, `OutcomeRecord`, `MetricResult`, the `keelgate.outcome_metrics` group, `discover_metrics`, `run_suite` |
+| **Provisional** | Works and is tested, but may change in a **minor** release, with a changelog entry. Pin a minor version if you depend on it. | `keelgate.llm.providers.*` (vendor SDKs move fast); `keelgate.adapters.*` (wrapped frameworks move too); memory backends and embedders; the Temporal runner; `keelgate.testing` harness and pytest fixture names; `OutcomeConfirmer`; `LoopRunner` and `LoopSpec`; telemetry attribute names (the GenAI conventions are still in development upstream); replay; report formats, CLI flags and red-team case ids |
 
 A symbol moves from Provisional to Stable when a downstream project has used it through a
 release without needing a change. The security guarantees at the end of this page are not
@@ -205,15 +205,44 @@ through the same path: **registry, grant, policy, approvals, audit**
 | `keelgate.adapters.a2a` | `a2a` | `build_agent_card`, `build_a2a_app`, `GovernedA2AExecutor`. Task intake is a governed PROPOSE tool (`a2a_task_intake`, capability `a2a:task_submit`); remote text is untrusted and never becomes the goal |
 | `keelgate.adapters.temporal` | `temporal` | `KeelgateLoopWorkflow`, `TemporalRunner`, `build_worker`: the loop as a Temporal activity |
 
-## Planned
+### `keelgate.telemetry`
 
-These modules import today and are empty. Their symbols are specified here so the
-implementation has a target.
+| Symbol | Kind | Notes |
+|---|---|---|
+| `instrument(service_name=, endpoint=, exporter=, redact=, capture_content=, ...)` | function | Configures tracing and activates it. OTLP/HTTP by default (`keelgate[otlp]`). Returns a `Telemetry`; call `.shutdown()` to flush |
+| `Telemetry`, `activate`, `active`, `use` | handle | The active tracer, meter, cost tracker and content-capture switch. Defaults to the application's global providers, so un-instrumented use is a no-op |
+| `span`, `traced`, `bind_run`, `run_span` | helpers | Emit a span (errors record the exception **type** only); bind tenant, agent and run to everything inside a block |
+| `InstrumentedLLM(client)` | wrapper | Each `complete` call becomes a GenAI `chat` span with tokens and cost |
+| `CostTracker`, `CostTotals` | cost | Per-tenant, per-agent tokens and dollars, plus OTel metrics. An unpriced model adds tokens, not dollars |
+| `Redactor`, `RedactingSpanProcessor` | redaction | Exporters receive a redacted copy of each span. Pattern-based; see the security model |
 
-| Module | Symbols |
-|---|---|
-| `keelgate.telemetry` | `instrument()`, span helpers (GenAI semantic conventions) |
-| `keelgate.evals` | `OutcomeMetric` protocol, entry-point discovery, `run_suite()` |
+One trace per loop run: the run's `trace_id` is its OpenTelemetry trace id, and a resumed run
+continues the same trace. Spans never carry tool arguments, tool output, prompts or exception
+messages. See [ADR-0005](adr/0005-telemetry-replay-and-evals.md).
+
+### `keelgate.loop` replay (added in K3)
+
+| Symbol | Kind | Notes |
+|---|---|---|
+| `Recording.from_store(store, tenant, trace_id=)` | classmethod | Rebuilds a run from checkpoint history; tenant-scoped |
+| `replay(recording)` | async function | Replays with recorded tool outputs, runs nothing, returns a `ReplayReport` (`identical`, `divergences`) |
+| `HistoryCheckpointStore` | protocol | A store that keeps every checkpoint: in-memory, SQLite and the LangGraph store do |
+| `GroundedAnswerVerifier` | verifier | Deterministic: figures must be supported by tool results; claims of action need a completed write |
+
+### `keelgate.evals`
+
+| Symbol | Kind | Notes |
+|---|---|---|
+| `OutcomeMetric` | protocol | `name`, `higher_is_better`, `compute(records) -> MetricResult`. **This is how downstream projects plug in metrics** |
+| `OutcomeRecord`, `MetricResult` | models | `predicted` and `realized` are free-form mappings whose keys the metric defines |
+| `discover_metrics()`, `ENTRY_POINT_GROUP` | discovery | Entry-point group `keelgate.outcome_metrics`; a class, factory or instance. A broken plugin is reported and skipped |
+| `run_suite(name)`, `run_suites(names)` | async functions | Suites: `unit`, `trajectory`, `redteam`, `outcome`. Scripted model by default |
+| `EvalReport`, `SuiteResult`, `CaseResult`, `EvalContext` | types | `report.passed` is false on any failing case or regression |
+| `to_dict`, `to_html`, `to_markdown`, `baseline_of`, `compare` | reports | JSON, a self-contained HTML page, a CI summary, and baseline comparison |
+| `keelgate eval run / list`, `keelgate replay` | CLI | Exit 0 passed, 1 failed or regressed, 2 usage error |
+
+The red-team case ids (`TI-01`, `CE-06`, ...) are used by baselines. Adding cases is a minor
+change; renaming or removing one makes a baseline report it as missing.
 
 ### Registering an outcome metric
 
