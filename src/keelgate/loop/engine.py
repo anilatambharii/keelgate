@@ -65,7 +65,7 @@ from keelgate.tools.outcomes import ErrorCode, OutcomeStatus, ToolOutcome
 from keelgate.tools.spec import SideEffect
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Sequence
+    from collections.abc import Callable, Mapping, Sequence
 
     from keelgate.approvals.queue import ApprovalQueue
     from keelgate.audit.log import AuditLog
@@ -75,7 +75,6 @@ if TYPE_CHECKING:
     from keelgate.loop.checkpoint import CheckpointStore
     from keelgate.memory.tiers import EpisodicMemory
     from keelgate.policy.types import PolicyContext
-    from keelgate.tools.gateway import ToolGateway
     from keelgate.tools.spec import ToolRegistry
 
 DEFAULT_SYSTEM_PROMPT: Final = (
@@ -100,6 +99,20 @@ class RunExistsError(Exception):
 
 class RunNotFoundError(Exception):
     """``resume`` found no checkpoint for that tenant and run id."""
+
+
+class ToolCaller(Protocol):
+    """What the loop needs from a gateway: one governed call. ``ToolGateway`` is the real one;
+    replay substitutes a recorded one that runs nothing."""
+
+    async def call(
+        self,
+        *,
+        tool_name: str,
+        arguments: Mapping[str, Any],
+        grant_token: str,
+        context: Any,
+    ) -> ToolOutcome: ...
 
 
 class OutcomeConfirmer(Protocol):
@@ -163,7 +176,7 @@ class Loop:
     def __init__(
         self,
         *,
-        gateway: ToolGateway,
+        gateway: ToolCaller,
         registry: ToolRegistry,
         planner: Planner,
         checkpoints: CheckpointStore,

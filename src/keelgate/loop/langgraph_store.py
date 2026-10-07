@@ -108,6 +108,16 @@ class LangGraphCheckpointStore:
             {_CHANNEL: state.checkpoint_seq},
         )
 
+    def history(self, tenant_id: str, run_id: str) -> list[LoopState]:
+        """Every checkpoint of a run, oldest first."""
+        config = self._config(tenant_id, run_id)
+        states = [
+            LoopState.model_validate(t.checkpoint["channel_values"][_CHANNEL])
+            for t in self._saver.list(config)
+        ]
+        states = [s for s in states if s.tenant_id == tenant_id]
+        return sorted(states, key=lambda s: s.checkpoint_seq)
+
     def load(self, tenant_id: str, run_id: str) -> LoopState | None:
         found = self._saver.get_tuple(self._config(tenant_id, run_id))
         if found is None:

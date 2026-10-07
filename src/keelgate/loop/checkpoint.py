@@ -38,11 +38,19 @@ class CheckpointStore(Protocol):
     def runs(self, tenant_id: str, *, prefix: str = "") -> list[str]: ...
 
 
+@runtime_checkable
+class HistoryCheckpointStore(CheckpointStore, Protocol):
+    """A store that keeps every checkpoint, oldest first. Replay needs this."""
+
+    def history(self, tenant_id: str, run_id: str) -> list[LoopState]: ...
+
+
 class InMemoryCheckpointStore:
     """Process-local. Fine for tests; it does not survive the process, so it cannot resume."""
 
     def __init__(self) -> None:
         self._latest: dict[tuple[str, str], str] = {}
+        self._history: dict[tuple[str, str], list[str]] = {}
         self._lock = threading.Lock()
 
     def save(self, state: LoopState) -> None:
@@ -56,12 +64,19 @@ class InMemoryCheckpointStore:
                 raise StaleCheckpointError(
                     f"{state.run_id}: seq {state.checkpoint_seq} is not newer"
                 )
-            self._latest[key] = state.model_dump_json()
+            encoded = state.model_dump_json()
+            self._latest[key] = encoded
+            self._history.setdefault(key, []).append(encoded)
 
     def load(self, tenant_id: str, run_id: str) -> LoopState | None:
         with self._lock:
             raw = self._latest.get((tenant_id, run_id))
         return LoopState.model_validate_json(raw) if raw else None
+
+    def history(self, tenant_id: str, run_id: str) -> list[LoopState]:
+        with self._lock:
+            rows = list(self._history.get((tenant_id, run_id), []))
+        return [LoopState.model_validate_json(r) for r in rows]
 
     def runs(self, tenant_id: str, *, prefix: str = "") -> list[str]:
         with self._lock:
