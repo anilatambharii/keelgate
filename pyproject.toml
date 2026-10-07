@@ -145,7 +145,7 @@ include = ["src/keelgate", "tests", "policies", "README.md", "LICENSE"]
 line-length = 100
 target-version = "py311"
 src = ["src", "tests"]
-extend-exclude = ["ee/dashboard", "deploy"]
+extend-exclude = ["ee/dashboard", "deploy", "*.md"]
 
 [tool.ruff.lint]
 select = [

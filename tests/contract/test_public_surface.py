@@ -138,3 +138,17 @@ def test_the_api_contract_document_matches_the_code() -> None:
 
 def test_the_version_is_a_plain_semantic_version() -> None:
     assert re.fullmatch(r"\d+\.\d+\.\d+", keelgate.__version__), keelgate.__version__
+
+
+def test_the_integration_contract_names_every_public_symbol() -> None:
+    """Every public symbol is mentioned by name in the prose contract (the API contract lists them all)."""
+    text = (ROOT_DIR / "docs" / "integration-contract.md").read_text(encoding="utf-8")
+    mentioned = set(re.findall(r"`([A-Za-z_][\w.]*)", text))
+    missing = [
+        f"{module}.{name}"
+        for module in PUBLIC_PACKAGES
+        for name in apidoc.symbols_of(module)
+        if name not in mentioned
+        and not any(t.startswith(name) or t.endswith("." + name) for t in mentioned)
+    ]
+    assert not missing, f"not named in docs/integration-contract.md: {missing}"

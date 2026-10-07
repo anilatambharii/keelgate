@@ -48,19 +48,19 @@ Tool registry and declaration, with each tool tagged by side effect.
 |---|---|---|---|
 | `CallContext` | class | stable | Per-call facts, split by trust. |
 | `Claim` | class | stable | The outcome of claiming an idempotency key. |
-| `ClaimState` | enum | stable | Enum where members are also (and must be) strings |
+| `ClaimState` | enum | stable | Where an idempotency key stands when a caller tries to claim it. |
 | `DirectInvocationError` | exception | stable | A tool was called without going through the gateway. |
-| `ErrorCode` | enum | stable | Enum where members are also (and must be) strings |
-| `IdempotencyStore` | protocol | stable | Base class for protocol classes. |
+| `ErrorCode` | enum | stable | Why the gateway refused or failed a call. |
+| `IdempotencyStore` | protocol | stable | Where idempotency keys and stored results live. |
 | `InMemoryIdempotencyStore` | class | stable | Process-local idempotency store. |
-| `OutcomeStatus` | enum | stable | Enum where members are also (and must be) strings |
-| `PAPER_MODES` | constant | stable | frozenset() -> empty frozenset object frozenset(iterable) -> frozenset object |
+| `OutcomeStatus` | enum | stable | The four things a gateway call can end as. |
+| `PAPER_MODES` | constant | stable |  |
 | `RegistryFrozenError` | exception | stable | A tool was registered after the registry was frozen. |
 | `SideEffect` | enum | stable | What a tool can do to the world. |
 | `SqliteIdempotencyStore` | class | provisional | Durable idempotency, safe to share between processes on one host. |
 | `Tool` | class | stable | A declared tool. |
 | `ToolDefinitionError` | exception | stable | The tool is declared unsafely or inconsistently. |
-| `ToolError` | model | stable | !!! |
+| `ToolError` | model | stable | A refusal or failure a model can act on: a code, fixed-wording message and hint, and whether a retry could help. |
 | `ToolGateway` | class | stable | The single choke point every tool call passes through. |
 | `ToolOutcome` | class | stable | The structured result of one gateway call. |
 | `ToolRefusedError` | exception | stable | Raised by a tool body to say: I did not do anything, so a retry is safe. |
@@ -131,28 +131,28 @@ Capability definitions and scoped, explicitly issued grants.
 | Symbol | Kind | Stability | Summary |
 |---|---|---|---|
 | `Budget` | model | stable | A spending ceiling, in whatever cost units the tools declare. |
-| `BudgetLedger` | protocol | stable | Base class for protocol classes. |
+| `BudgetLedger` | protocol | stable | Where a grant's remaining budget is tracked. |
 | `Capability` | class | stable | A validated capability string. |
 | `CapabilityGrant` | model | stable | The verified claims of a grant. |
-| `DEFAULT_MAX_TTL` | constant | stable | Difference between two datetime values. |
+| `DEFAULT_MAX_TTL` | constant | stable |  |
 | `GrantError` | exception | stable | Base class: the presented grant cannot be used. |
-| `GrantExpiredError` | exception | stable | Base class: the presented grant cannot be used. |
+| `GrantExpiredError` | exception | stable | The grant's lifetime has ended. |
 | `GrantInvalidError` | exception | stable | Malformed, wrongly signed, wrong purpose, or otherwise untrustworthy. |
-| `GrantNotYetValidError` | exception | stable | Base class: the presented grant cannot be used. |
-| `GrantRevokedError` | exception | stable | Base class: the presented grant cannot be used. |
+| `GrantNotYetValidError` | exception | stable | The grant's not-before time has not arrived. |
+| `GrantRevokedError` | exception | stable | The grant was revoked after it was issued. |
 | `GrantSigner` | class | stable | Holds the Ed25519 private key and signs grants. |
 | `GrantVerifier` | class | stable | Verifies grant tokens against a set of trusted public keys. |
 | `InMemoryBudgetLedger` | class | stable | Atomic per-grant spend tracking. |
 | `InMemoryRevocationList` | class | stable | Process-local revocations. |
 | `InvalidCapabilityError` | exception | stable | Raised for a malformed capability string, including any wildcard. |
-| `MARKET_DATA_READ` | constant | stable | A validated capability string. |
-| `REPORT_WRITE` | constant | stable | A validated capability string. |
-| `RevocationList` | protocol | stable | Base class for protocol classes. |
+| `MARKET_DATA_READ` | constant | stable |  |
+| `REPORT_WRITE` | constant | stable |  |
+| `RevocationList` | protocol | stable | Where revoked grant ids are recorded. |
 | `SignedGrant` | class | stable | A freshly issued grant: the bearer ``token`` and its parsed ``grant``. |
 | `SqliteBudgetLedger` | class | provisional | Atomic per-grant spend, persisted. |
 | `SqliteRevocationList` | class | provisional | Persisted revocations. |
-| `TRADE_PAPER_EXECUTE` | constant | stable | A validated capability string. |
-| `TRADE_PROPOSE` | constant | stable | A validated capability string. |
+| `TRADE_PAPER_EXECUTE` | constant | stable |  |
+| `TRADE_PROPOSE` | constant | stable |  |
 | `UnknownKeyError` | exception | stable | Signed by a key the verifier does not trust. |
 | `issue_grant` | function | stable | Mint a grant. |
 
@@ -217,14 +217,14 @@ Policy-as-code decision point.
 
 | Symbol | Kind | Stability | Summary |
 |---|---|---|---|
-| `Decision` | enum | stable | Enum where members are also (and must be) strings |
+| `Decision` | enum | stable | What a policy engine decides: ``ALLOW``, ``DENY`` or ``REQUIRE_APPROVAL``. |
 | `OpaHttpEngine` | class | stable | Policy engine that asks an OPA server over HTTP (the production default). |
-| `PolicyAction` | model | stable | !!! |
-| `PolicyActor` | model | stable | !!! |
+| `PolicyAction` | model | stable | The proposed action a policy judges: the tool, its side effect and capability, and its arguments. |
+| `PolicyActor` | model | stable | Who is acting, as verified from the grant: the agent, the tenant and the grant id. |
 | `PolicyContext` | model | stable | Trusted facts about the world at ``as_of``. |
 | `PolicyDecision` | model | stable | What the policy decided, and exactly which policy decided it. |
 | `PolicyEngine` | protocol | stable | Decides ALLOW / DENY / REQUIRE_APPROVAL for one proposed action. |
-| `PolicyInput` | model | stable | !!! |
+| `PolicyInput` | model | stable | Everything a policy engine is given: the action, the actor, the resource facts derived from validated arguments, and the trusted context. |
 | `RegoEngine` | class | stable | Policy engine that evaluates the same Rego packs in-process. |
 | `decision_from_result` | function | stable | Turn an engine's raw result into a decision, failing closed. |
 | `deny` | function | stable | A fail-closed denial. |
@@ -270,8 +270,8 @@ Tamper-evident, hash-chained audit log and its verifier.
 |---|---|---|---|
 | `AuditError` | exception | stable | The audit log could not be written or read correctly. |
 | `AuditLog` | class | stable | Append-only, hash-chained, per-tenant audit log. |
-| `AuditRecord` | model | stable | !!! |
-| `AuditStore` | protocol | stable | Base class for protocol classes. |
+| `AuditRecord` | model | stable | One hash-chained entry in a tenant's audit log: sequence, time, event type, actor, payload and the hashes that link it to the one before. |
+| `AuditStore` | protocol | stable | Where audit records are persisted (SQLite and Postgres ship). |
 | `ChainHead` | class | stable | The newest record of a tenant's chain. |
 | `ChainVerification` | class | stable | The result of verifying one tenant's audit chain. |
 | `EventType` | enum | stable | Event kinds Keelgate itself emits. |
@@ -325,19 +325,19 @@ Human-in-the-loop approval requests and the queue that serves them.
 | Symbol | Kind | Stability | Summary |
 |---|---|---|---|
 | `ApprovalError` | exception | stable | Base class. |
-| `ApprovalExpiredError` | exception | stable | Base class. |
-| `ApprovalNotAuthorisedError` | exception | stable | Base class. |
-| `ApprovalNotFoundError` | exception | stable | Base class. |
-| `ApprovalNotPendingError` | exception | stable | Base class. |
+| `ApprovalExpiredError` | exception | stable | The approval request expired before it was decided or used. |
+| `ApprovalNotAuthorisedError` | exception | stable | The approver may not decide this request: wrong tenant, tier too low, or the requester itself. |
+| `ApprovalNotFoundError` | exception | stable | No such request for this tenant. |
+| `ApprovalNotPendingError` | exception | stable | The request was already decided. |
 | `ApprovalNotUsableError` | exception | stable | The request exists but cannot back this execution (wrong state or action). |
 | `ApprovalQueue` | class | stable | The human-in-the-loop approval queue (SQLite-backed). |
-| `ApprovalRequest` | model | stable | !!! |
-| `ApprovalSignoffError` | exception | stable | Base class. |
-| `ApprovalStatus` | enum | stable | Enum where members are also (and must be) strings |
+| `ApprovalRequest` | model | stable | A call parked for a human: the exact arguments' hash, the tier required, the evidence bundle, and the request's status and decision. |
+| `ApprovalSignoffError` | exception | stable | An explicit sign-off was required and the code supplied was missing or wrong. |
+| `ApprovalStatus` | enum | stable | Where an approval request is: pending, approved, rejected, expired or consumed. |
 | `ApprovalTier` | enum | stable | How much human attention an action needs. |
 | `Approver` | model | stable | A human cleared to decide requests in one tenant up to ``max_tier``. |
 | `EvidenceBundle` | model | stable | What an approver needs to decide, and what their decision is bound to. |
-| `EvidenceSource` | model | stable | !!! |
+| `EvidenceSource` | model | stable | A source cited in an approval's evidence: where it came from, when it was retrieved, and a hash of its content. |
 | `action_hash` | function | stable | Hash of exactly what will run. |
 | `sanitize_for_display` | function | stable | Strip control characters so model-derived text cannot drive a terminal. |
 
@@ -380,14 +380,14 @@ Durable, budgeted agent loop with explicit stop conditions and resume.
 | Symbol | Kind | Stability | Summary |
 |---|---|---|---|
 | `AcceptAllVerifier` | class | stable | Accepts everything. |
-| `ActionOutcome` | model | stable | !!! |
-| `ActionStatus` | enum | stable | Enum where members are also (and must be) strings |
+| `ActionOutcome` | model | stable | What happened to one planned action: status, error code and fixed-wording detail, and the tool output as untrusted JSON text. |
+| `ActionStatus` | enum | stable | Where a planned action stands: pending, done, denied, error, awaiting approval, unknown (may or may not have happened) or abandoned. |
 | `CallableVerifier` | class | stable | Wraps a plain function (sync or async) returning a Verdict, a decision or a bool. |
-| `CheckpointStore` | protocol | stable | Base class for protocol classes. |
+| `CheckpointStore` | protocol | stable | Where loop state is saved after every step. |
 | `ContextSource` | protocol | stable | Supplies extra context for a plan step, such as retrieved memory. |
-| `DEFAULT_SYSTEM_PROMPT` | constant | stable | str(object='') -> str str(bytes_or_buffer[, encoding[, errors]]) -> str |
+| `DEFAULT_SYSTEM_PROMPT` | constant | stable |  |
 | `Divergence` | class | provisional | One difference between a recorded run and its replay: where, what was expected and what was seen. |
-| `GoalPredicate` | function | stable |  |
+| `GoalPredicate` | type alias | stable |  |
 | `GroundedAnswerVerifier` | class | provisional | A deterministic verifier: is the final answer supported by what the tools returned? |
 | `HistoryCheckpointStore` | protocol | provisional | A store that keeps every checkpoint, oldest first. |
 | `InMemoryCheckpointStore` | class | stable | Process-local. |
@@ -399,19 +399,19 @@ Durable, budgeted agent loop with explicit stop conditions and resume.
 | `LoopResult` | class | stable | What a ``Loop`` run or resume returns. |
 | `LoopRunner` | protocol | provisional | Starts a run, or resumes it if a checkpoint exists. |
 | `LoopSpec` | class | provisional | Everything needed to start or resume one run, as plain data. |
-| `LoopState` | model | stable | !!! |
-| `LoopType` | enum | stable | Enum where members are also (and must be) strings |
+| `LoopState` | model | stable | Everything a run needs to resume: the goal, the phase, the planned actions and their outcomes, usage, and the trace identity. |
+| `LoopType` | enum | stable | The kind of run: a ``TASK``, a read-only ``VERIFICATION``, or a ``MONITOR`` tick. |
 | `MonitorLoop` | class | provisional | Runs a bounded loop on a schedule, finishing a half-done tick after a restart. |
 | `MonitorSummary` | class | provisional | The outcome of a bounded monitoring session: how many ticks ran and each tick's result. |
 | `NotReplayableError` | exception | provisional | The recording lacks a recorded result for some action, or the run cannot be found. |
 | `OutcomeConfirmer` | protocol | provisional | Settles an action whose outcome is unknown by asking the downstream system of record. |
-| `Phase` | enum | stable | Enum where members are also (and must be) strings |
+| `Phase` | enum | stable | Where a run is in its cycle: plan, act, observe, verify, or done. |
 | `Plan` | class | stable | What the planner proposed: actions to run, or a final answer, never both. |
 | `PlanRequest` | class | stable | What the planner is given for one planning call. |
-| `PlannedAction` | model | stable | !!! |
-| `Planner` | protocol | stable | Base class for protocol classes. |
+| `PlannedAction` | model | stable | One tool call the planner chose, written down before it runs so a resume re-submits the same arguments. |
+| `Planner` | protocol | stable | Proposes the next step: tool calls to run, or a final answer. |
 | `ProposedAction` | class | stable | One tool call the planner proposes: a tool name, untrusted arguments and a rationale. |
-| `READ_ONLY` | constant | provisional | frozenset() -> empty frozenset object frozenset(iterable) -> frozenset object |
+| `READ_ONLY` | constant | provisional |  |
 | `RecordedAction` | class | provisional | One tool call as recorded in a run: name, arguments, final status and outcome. |
 | `RecordedStep` | class | provisional | One iteration of a recorded run: the actions proposed, the final answer if any and the verdict. |
 | `Recording` | class | provisional | A run rebuilt from its checkpoint history, ready to replay. |
@@ -422,11 +422,11 @@ Durable, budgeted agent loop with explicit stop conditions and resume.
 | `SqliteCheckpointStore` | class | stable | Durable, dependency-free. |
 | `StaleCheckpointError` | exception | stable | A newer checkpoint already exists: another writer got there first. |
 | `StopConditions` | class | stable | Limits for one run. |
-| `StopReason` | enum | stable | Enum where members are also (and must be) strings |
+| `StopReason` | enum | stable | Why a run stopped: the goal was reached, a limit was hit (iterations, tokens, dollars, time), the verifier rejected too often, an outcome is unknown, an approval is pending, or an error. |
 | `Verdict` | class | stable | A verifier's judgement of a proposed final answer. |
-| `VerdictDecision` | enum | stable | Enum where members are also (and must be) strings |
+| `VerdictDecision` | enum | stable | A verifier's answer: ``ACCEPT``, ``REVISE`` or ``REJECT``. |
 | `VerificationLoop` | class | provisional | A loop that can only read. |
-| `Verifier` | protocol | stable | Base class for protocol classes. |
+| `Verifier` | protocol | stable | Judges a proposed final answer. |
 | `VerifyRequest` | class | stable | What the verifier is given. |
 | `default_checkpointer` | function | stable | A durable store: LangGraph's SQLite saver if installed, else the standard-library one. |
 | `diff` | function | provisional | Compare two recordings step by step and return every divergence (empty when they match). |
@@ -450,7 +450,7 @@ protocol ContextSource
     retrieve(state: LoopState) -> Sequence[ContextItem]
 DEFAULT_SYSTEM_PROMPT = str(...)
 class Divergence(where: str, expected: Any, actual: Any) -> None
-def GoalPredicate(*args, **kwargs)
+type GoalPredicate = collections.abc.Callable[['LoopState'], bool]
 class GroundedAnswerVerifier(*, write_tools: Iterable[str] | None = None) -> None
     async verify(request: VerifyRequest) -> Verdict
 protocol HistoryCheckpointStore
@@ -562,23 +562,23 @@ As-of-time context assembly.
 | `ContextBudgetError` | exception | stable | Trusted content alone does not fit the token budget. |
 | `ContextBuilder` | class | stable | Assembles a prompt for a given ``as_of``. |
 | `ContextError` | exception | stable | Base class for context assembly failures. |
-| `ContextItem` | model | stable | !!! |
+| `ContextItem` | model | stable | One piece of context: its content, trust level, publication time and provenance. |
 | `DuplicateItemError` | exception | stable | Two items share an id. |
 | `ExtractiveSummarizer` | class | stable | Deterministic and model-free: the first sentence of each item, with a pointer. |
-| `FENCE_TOKENS` | constant | stable | int([x]) -> integer int(x, base=10) -> integer |
-| `HARNESS_KINDS` | constant | stable | frozenset() -> empty frozenset object frozenset(iterable) -> frozenset object |
+| `FENCE_TOKENS` | constant | stable |  |
+| `HARNESS_KINDS` | constant | stable |  |
 | `InMemoryRecordStore` | class | stable | Process-local store of full context records, so a compacted summary can always be traced back to what it replaced. |
-| `ItemKind` | enum | stable | Enum where members are also (and must be) strings |
+| `ItemKind` | enum | stable | What a context item is: system text, an instruction, the task, an observation, memory, a document or a summary. |
 | `LLMSummarizer` | class | stable | Asks a model for a structured summary, and falls back to extraction if it misbehaves. |
 | `Provenance` | model | stable | Where an item came from. |
 | `RecordStore` | protocol | stable | Keeps the full text behind a summary pointer. |
 | `Rejection` | class | stable | A refused item. |
-| `RejectionReason` | enum | stable | Enum where members are also (and must be) strings |
-| `StructuredSummary` | model | stable | !!! |
-| `Summarizer` | protocol | stable | Base class for protocol classes. |
-| `TokenCounter` | protocol | stable | Base class for protocol classes. |
-| `Trust` | enum | stable | Enum where members are also (and must be) strings |
-| `UNTRUSTED_NOTICE` | constant | stable | str(object='') -> str str(bytes_or_buffer[, encoding[, errors]]) -> str |
+| `RejectionReason` | enum | stable | Why an item was kept out of the context: published after ``as_of``, undated, or a duplicate id. |
+| `StructuredSummary` | model | stable | A compacted summary: facts, decisions and open questions, plus pointers back to the full records it replaced. |
+| `Summarizer` | protocol | stable | Compacts items into a structured summary. |
+| `TokenCounter` | protocol | stable | Counts the tokens in a piece of text, so the builder can honour a budget. |
+| `Trust` | enum | stable | Whether a context item may be treated as an instruction (``TRUSTED``) or only as data (``UNTRUSTED``). |
+| `UNTRUSTED_NOTICE` | constant | stable |  |
 | `UndatedItemError` | exception | stable | An outside item carries no publication time, so it cannot be shown to be earlier. |
 
 <details><summary>Signatures</summary>
@@ -640,16 +640,16 @@ Layered memory: working, episodic, semantic and procedural.
 |---|---|---|---|
 | `Attribution` | model | stable | Who wrote a version, and under which trace. |
 | `ConcurrentWriteError` | exception | stable | Another writer created the next version first. |
-| `Embedder` | protocol | stable | Base class for protocol classes. |
+| `Embedder` | protocol | stable | Turns text into a vector of a fixed size (``dim``) for semantic search. |
 | `EmbeddingError` | exception | provisional | The embedding service failed or returned something unusable. |
 | `EpisodicMemory` | class | stable | What the agent decided and what came of it. |
 | `HashEmbedder` | class | provisional | A deterministic bag-of-words embedder with no model and no network. |
 | `InvalidMemoryWriteError` | exception | stable | The write is malformed for its tier. |
 | `Memory` | protocol | stable | The interface every tier implements. |
-| `MemoryBackend` | protocol | provisional | Base class for protocol classes. |
-| `MemoryRecord` | model | stable | !!! |
+| `MemoryBackend` | protocol | provisional | Storage for memory records. |
+| `MemoryRecord` | model | stable | One version of one memory: its content, who wrote it and under which trace, when it was recorded, and for semantic facts the window in which it is valid. |
 | `MemoryStoreError` | exception | stable | Base class for memory failures. |
-| `MemoryTier` | enum | stable | Enum where members are also (and must be) strings |
+| `MemoryTier` | enum | stable | The four layers of memory: working, episodic, semantic and procedural. |
 | `OllamaEmbedder` | class | provisional | Embeds text with a local Ollama server (``/api/embed``). |
 | `OpenAICompatibleEmbedder` | class | provisional | Embeds text with OpenAI or any server speaking the OpenAI ``/embeddings`` format. |
 | `PostgresMemoryBackend` | class | provisional | Shared memory on Postgres with the ``pgvector`` extension. |
@@ -761,17 +761,17 @@ Model-agnostic LLM client boundary.
 
 | Symbol | Kind | Stability | Summary |
 |---|---|---|---|
-| `FinishReason` | enum | stable | Enum where members are also (and must be) strings |
+| `FinishReason` | enum | stable | Why a model stopped: a natural stop, tool calls, the length limit, or something else. |
 | `LLMAuthError` | exception | stable | Credentials are missing or rejected. |
 | `LLMClient` | protocol | stable | A model-agnostic chat client. |
 | `LLMError` | exception | stable | A provider call failed. |
-| `LLMRateLimitError` | exception | stable | A provider call failed. |
-| `LLMRequest` | model | stable | !!! |
-| `LLMResponse` | model | stable | !!! |
-| `Message` | model | stable | !!! |
+| `LLMRateLimitError` | exception | stable | The provider asked the caller to slow down. |
+| `LLMRequest` | model | stable | A provider-neutral request: model, messages, the tools offered, a token limit. |
+| `LLMResponse` | model | stable | A provider-neutral reply: one assistant message, usage with cost if known, and why it stopped. |
+| `Message` | model | stable | One message in a conversation: a role, text, any tool calls the assistant made, and for a tool result which call it answers. |
 | `ModelPrice` | class | stable | USD per million tokens. |
 | `PricingTable` | class | stable | Looks a model up by exact name, then by the longest matching prefix. |
-| `Role` | enum | stable | Enum where members are also (and must be) strings |
+| `Role` | enum | stable | Who said a message: system, user, assistant or tool. |
 | `ToolCall` | model | stable | A tool invocation the model proposes. |
 | `ToolSchema` | model | stable | A tool offered to the model. |
 | `Usage` | model | stable | Tokens and money for one call. |
@@ -817,7 +817,7 @@ OpenTelemetry tracing, cost tracking and PII redaction for Keelgate.
 | `RunContext` | class | stable | The tenant, agent and run that spans and costs created inside a block are attributed to. |
 | `RunSpan` | class | provisional | The root span of a loop run, with the ids that identify the run's trace. |
 | `Telemetry` | class | stable | A tracer, a meter, a cost tracker, and the content-capture switch. |
-| `UNATTRIBUTED` | constant | provisional | str(object='') -> str str(bytes_or_buffer[, encoding[, errors]]) -> str |
+| `UNATTRIBUTED` | constant | provisional |  |
 | `activate` | function | stable | Make ``telemetry`` the active handle for the process (``None`` restores the default). |
 | `active` | function | stable | The currently active ``Telemetry`` handle. |
 | `attributes` | module | provisional | Span and metric attribute names. |
@@ -883,7 +883,7 @@ Agent evals, red-team suites and outcome-metric plugins.
 |---|---|---|---|
 | `AccuracyMetric` | class | provisional | Fraction of records whose ``predicted["label"]`` equals ``realized["label"]``. |
 | `CaseResult` | class | provisional | One eval case. |
-| `ENTRY_POINT_GROUP` | constant | stable | str(object='') -> str str(bytes_or_buffer[, encoding[, errors]]) -> str |
+| `ENTRY_POINT_GROUP` | constant | stable |  |
 | `EvalContext` | class | provisional | ``fake`` mode replays each case's scripted model (deterministic, free, runs on every PR). |
 | `EvalReport` | class | provisional | Everything one eval run produced: the suites, any regressions against a baseline, and notes. |
 | `EvalStack` | class | provisional | One isolated stack. |
@@ -891,7 +891,7 @@ Agent evals, red-team suites and outcome-metric plugins.
 | `MetricResult` | class | stable | One metric's value over a batch of outcomes, with how many records it used and which direction is better. |
 | `OutcomeMetric` | protocol | stable | A named measure over a batch of outcomes. |
 | `OutcomeRecord` | class | stable | One decision and what came of it. |
-| `SUITES` | constant | provisional | Built-in immutable sequence. |
+| `SUITES` | constant | provisional |  |
 | `SuiteResult` | class | provisional | The cases and metrics of one eval suite. |
 | `baseline_of` | function | provisional | The facts a future run must not regress below: passing cases and metric values. |
 | `compare` | function | provisional | Every way ``report`` is worse than ``baseline``. |
@@ -1009,7 +1009,7 @@ Adapters that wrap existing agent frameworks.
 | Symbol | Kind | Stability | Summary |
 |---|---|---|---|
 | `GovernedToolset` | class | stable | A registry of tools bound to a gateway, a grant and a trusted context. |
-| `UNTRUSTED_KEY` | constant | stable | str(object='') -> str str(bytes_or_buffer[, encoding[, errors]]) -> str |
+| `UNTRUSTED_KEY` | constant | stable |  |
 
 <details><summary>Signatures</summary>
 
@@ -1063,7 +1063,7 @@ Model Context Protocol adapter.
 |---|---|---|---|
 | `Discovery` | class | provisional | What was found on the server, and what happened to each tool. |
 | `ExternalArgs` | model | provisional | Passthrough arguments for an external tool; the remote JSON schema is enforced separately. |
-| `ExternalOutput` | model | provisional | !!! |
+| `ExternalOutput` | model | provisional | What a governed external MCP tool returns, wrapped so it stays labelled untrusted. |
 | `ExternalToolError` | exception | provisional | The external server reported an error, or returned something unusable. |
 | `ExternalToolMapping` | class | provisional | How one external tool is admitted: the capability and side effect *you* assign. |
 | `GovernedMCPClient` | class | provisional | Wraps an MCP client (anything with ``list_tools`` and ``call_tool``). |
@@ -1145,7 +1145,7 @@ Claude Agent SDK adapter: governed tools as an in-process MCP server, and locked
 
 | Symbol | Kind | Stability | Summary |
 |---|---|---|---|
-| `BUILTIN_TOOLS` | constant | provisional | Built-in immutable sequence. |
+| `BUILTIN_TOOLS` | constant | provisional |  |
 | `governed_claude_options` | function | provisional | ``ClaudeAgentOptions`` that confine an agent to the governed tools. |
 | `governed_sdk_mcp_server` | function | provisional | An in-process MCP server exposing the governed tools to the Claude Agent SDK. |
 | `governed_tool_names` | function | provisional | The SDK's fully qualified names for the governed tools: ``mcp__<server>__<tool>``. |
@@ -1168,9 +1168,9 @@ Agent-to-Agent (A2A) adapter: an agent card and task intake under policy.
 | Symbol | Kind | Stability | Summary |
 |---|---|---|---|
 | `GovernedA2AExecutor` | class | provisional | Runs inbound A2A tasks through the intake gate, then the supplied runner. |
-| `INTAKE_TOOL` | constant | provisional | str(object='') -> str str(bytes_or_buffer[, encoding[, errors]]) -> str |
-| `IntakeIn` | model | provisional | !!! |
-| `IntakeOut` | model | provisional | !!! |
+| `INTAKE_TOOL` | constant | provisional |  |
+| `IntakeIn` | model | provisional | The arguments of the governed ``a2a_task_intake`` tool: the remote task's text, id and context. |
+| `IntakeOut` | model | provisional | The result of accepting an A2A task: whether it was accepted and its id. |
 | `TaskRequest` | class | provisional | A task from a remote caller. |
 | `TaskResult` | class | provisional | What a task runner returns for an A2A task: the text to report and whether it succeeded. |
 | `build_a2a_app` | function | provisional | A Starlette app serving the agent card and the JSON-RPC task endpoint. |
@@ -1203,8 +1203,8 @@ Temporal adapter: run a Keelgate loop as a Temporal workflow (``keelgate[tempora
 
 | Symbol | Kind | Stability | Summary |
 |---|---|---|---|
-| `ACTIVITY_NAME` | constant | provisional | str(object='') -> str str(bytes_or_buffer[, encoding[, errors]]) -> str |
-| `DEFAULT_TASK_QUEUE` | constant | provisional | str(object='') -> str str(bytes_or_buffer[, encoding[, errors]]) -> str |
+| `ACTIVITY_NAME` | constant | provisional |  |
+| `DEFAULT_TASK_QUEUE` | constant | provisional |  |
 | `KeelgateLoopWorkflow` | class | provisional | A Temporal workflow that runs one loop as an activity. |
 | `LoopActivities` | class | provisional | The activity implementation. |
 | `TemporalRunner` | class | provisional | A :class:`~keelgate.loop._runner.LoopRunner` that starts the loop as a Temporal workflow. |
@@ -1235,7 +1235,7 @@ Keelgate — a safety-first agent harness for AI agents that touch money.
 
 | Symbol | Kind | Stability | Summary |
 |---|---|---|---|
-| `__version__` | constant | stable | str(object='') -> str str(bytes_or_buffer[, encoding[, errors]]) -> str |
+| `__version__` | constant | stable |  |
 
 <details><summary>Signatures</summary>
 
