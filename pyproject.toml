@@ -80,6 +80,9 @@ a2a = [
 cedar = [
     "cedarpy>=4.12,<5",
 ]
+otlp = [
+    "opentelemetry-exporter-otlp-proto-http>=1.45,<2",   # OTLP/HTTP trace export (Jaeger, Phoenix)
+]
 server = [
     "fastapi>=0.142,<1",
     "uvicorn[standard]>=0.54,<1",
@@ -109,6 +112,7 @@ dev = [
     "mcp>=2.3",
     "a2a-sdk>=1.2",
     "temporalio>=1.34",
+    "opentelemetry-exporter-otlp-proto-http>=1.45",
     "httpx2>=1",                 # what starlette's TestClient now expects
     "psycopg[binary]>=3.3",      # Postgres audit backend tests
 ]
