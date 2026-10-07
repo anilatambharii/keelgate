@@ -92,9 +92,11 @@ services:
     image: openpolicyagent/opa:1.9.0
     profiles: ["tools"]
     entrypoint: ["/opa"]
-    working_dir: /policies
+    # Same relative paths as a local `opa`: policies/ and examples/custom_policy_pack/.
+    working_dir: /work
     volumes:
-      - ./policies:/policies:ro
+      - ./policies:/work/policies:ro
+      - ./examples/custom_policy_pack:/work/examples/custom_policy_pack:ro
 
 volumes:
   postgres-data:

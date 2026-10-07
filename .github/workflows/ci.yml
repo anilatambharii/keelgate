@@ -186,13 +186,13 @@ jobs:
           version: 1.9.0
 
       - name: Check (strict)
-        run: opa check --strict policies
+        run: opa check --strict policies examples/custom_policy_pack
 
       - name: Formatting
-        run: opa fmt --fail policies
+        run: opa fmt --fail policies examples/custom_policy_pack
 
       - name: Unit tests
-        run: opa test policies -v
+        run: opa test policies examples/custom_policy_pack -v
 
   evals:
     # Scripted-model evals on every PR: unit, trajectory, red-team and outcome suites, compared

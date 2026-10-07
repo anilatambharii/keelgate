@@ -23,6 +23,14 @@ CONSUMERS = [
     ROOT / "examples" / "governed_langgraph_agent.py",
     ROOT / "examples" / "mcp_server.py",
     ROOT / "examples" / "custom_policy_pack" / "run.py",
+    ROOT / "examples" / "tutorial_governed_agent.py",
+    ROOT / "examples" / "research_loop.py",
+    ROOT
+    / "examples"
+    / "outcome_metric_plugin"
+    / "src"
+    / "keelgate_example_metrics"
+    / "__init__.py",
 ]
 
 
@@ -72,5 +80,6 @@ def test_the_checker_actually_catches_a_private_import(tmp_path: Path) -> None:
     assert len(found) == 3 and "private module" in found[0] and "not a public symbol" in found[1]
 
 
-def test_the_main_consumer_files_exist() -> None:
-    assert CONSUMERS[0].exists() and CONSUMERS[1].exists()
+def test_every_documented_example_exists_and_is_checked() -> None:
+    missing = [p.name for p in CONSUMERS if not p.exists()]
+    assert missing == [], missing

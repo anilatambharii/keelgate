@@ -9,10 +9,10 @@ COMPOSE ?= docker compose -f docker-compose.dev.yml
 # the command line, which keeps them away from Windows shells that rewrite "/paths".
 ifeq ($(shell command -v opa >/dev/null 2>&1 && echo yes),yes)
 OPA     := opa
-OPA_DIR := policies
+OPA_DIR := policies examples/custom_policy_pack
 else
 OPA     := $(COMPOSE) run --rm opa-tools
-OPA_DIR := .
+OPA_DIR := policies examples/custom_policy_pack
 endif
 
 .PHONY: help setup setup-all lock fmt lint format-check types test check \
