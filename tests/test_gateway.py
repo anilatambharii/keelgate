@@ -14,7 +14,7 @@ from pydantic import BaseModel
 
 from keelgate.approvals import ApprovalStatus, ApprovalTier
 from keelgate.audit import AuditError, AuditLog, AuditRecord, ChainHead, EventType, SqliteAuditStore
-from keelgate.audit.stores import BuildRecord
+from keelgate.audit._stores import BuildRecord
 from keelgate.capabilities import GrantSigner, issue_grant
 from keelgate.policy import Decision, PolicyDecision, PolicyInput
 from keelgate.tools import (

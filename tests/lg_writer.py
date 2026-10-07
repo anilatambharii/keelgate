@@ -7,8 +7,8 @@ import time
 from datetime import UTC, datetime
 
 from keelgate.loop import StaleCheckpointError
+from keelgate.loop._state import LoopState
 from keelgate.loop.langgraph_store import LangGraphCheckpointStore
-from keelgate.loop.state import LoopState
 
 db, start, writer = sys.argv[1], float(sys.argv[2]), int(sys.argv[3])
 now = datetime(2026, 10, 5, 14, 30, tzinfo=UTC)

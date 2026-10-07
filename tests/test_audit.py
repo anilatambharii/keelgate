@@ -24,7 +24,7 @@ from keelgate.audit import (
     genesis_hash,
     verify_chain,
 )
-from keelgate.audit.records import build_record
+from keelgate.audit._records import build_record
 from tests.conftest import Clock, skip_or_fail
 
 T0 = datetime(2026, 1, 1, tzinfo=UTC)

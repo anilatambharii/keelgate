@@ -181,7 +181,7 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 # The _check_write / _embedding_for / _record_id_for hooks share one signature across all four
 # tiers; each tier uses only the arguments it needs.
-"src/keelgate/memory/tiers.py" = ["ARG002"]
+"src/keelgate/memory/_tiers.py" = ["ARG002"]
 # Tests and the demo are not shipped, and deliberately do things library code must not:
 # assert, poke privates, hold dummy secrets, import locally to mutate the gateway.
 "tests/**" = [

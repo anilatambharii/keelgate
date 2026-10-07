@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING, Any, Final
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from keelgate.evals.types import EvalReport
+    from keelgate.evals._types import EvalReport
     from keelgate.llm import LLMClient
 
 OK: Final = 0
@@ -134,8 +134,10 @@ def _run(args: argparse.Namespace) -> int:
 
 
 def _list(_: argparse.Namespace) -> int:
-    from keelgate.evals import redteam, trajectory, unit  # noqa: PLC0415
-    from keelgate.evals.metrics import discover_metrics  # noqa: PLC0415
+    from keelgate.evals import _redteam as redteam  # noqa: PLC0415
+    from keelgate.evals import _trajectory as trajectory  # noqa: PLC0415
+    from keelgate.evals import _unit as unit  # noqa: PLC0415
+    from keelgate.evals._metrics import discover_metrics  # noqa: PLC0415
 
     out = sys.stdout.write
     out("unit\n" + "".join(f"  {c.case_id}  {c.prompt}\n" for c in unit.CASES))

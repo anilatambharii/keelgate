@@ -9,7 +9,7 @@ import pytest
 
 from keelgate.context import ContextItem, ItemKind
 from keelgate.loop import GroundedAnswerVerifier, VerdictDecision
-from keelgate.loop.roles import VerifyRequest
+from keelgate.loop._roles import VerifyRequest
 from tests.conftest import MARKET_OPEN, run
 
 

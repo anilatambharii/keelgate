@@ -5,8 +5,8 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING, Any
 
-from keelgate.llm.pricing import PricingTable
-from keelgate.llm.types import (
+from keelgate.llm._pricing import PricingTable
+from keelgate.llm._types import (
     LLMAuthError,
     LLMError,
     LLMRateLimitError,

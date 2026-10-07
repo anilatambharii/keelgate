@@ -34,8 +34,8 @@ def test_a_real_agent_acts_only_through_governed_tools(rego_engine: Any) -> None
     _preconditions()
     from claude_agent_sdk import ClaudeSDKClient
 
+    from keelgate.adapters._governed import GovernedToolset
     from keelgate.adapters.claude_agent_sdk import governed_claude_options
-    from keelgate.adapters.governed import GovernedToolset
     from tests.conftest import build_harness
 
     h = build_harness(engine=rego_engine)

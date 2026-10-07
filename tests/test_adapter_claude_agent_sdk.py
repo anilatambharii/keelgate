@@ -16,13 +16,13 @@ pytest.importorskip("claude_agent_sdk")
 
 from mcp import Client
 
+from keelgate.adapters._governed import UNTRUSTED_KEY, GovernedToolset
 from keelgate.adapters.claude_agent_sdk import (
     BUILTIN_TOOLS,
     governed_claude_options,
     governed_sdk_mcp_server,
     governed_tool_names,
 )
-from keelgate.adapters.governed import UNTRUSTED_KEY, GovernedToolset
 from keelgate.tools import SideEffect
 from tests.conftest import Harness, run
 

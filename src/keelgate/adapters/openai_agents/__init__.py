@@ -5,8 +5,8 @@ or newer: 3.11.0 has a ``typing`` bug that stops ``import agents`` from working 
 """
 
 try:
-    from keelgate.adapters.openai_agents.model import KeelgateModel, to_keelgate_messages
-    from keelgate.adapters.openai_agents.tools import governed_function_tools
+    from keelgate.adapters.openai_agents._model import KeelgateModel, to_keelgate_messages
+    from keelgate.adapters.openai_agents._tools import governed_function_tools
 except ImportError as exc:  # pragma: no cover - depends on the extra
     raise ImportError(
         "keelgate.adapters.openai_agents needs the OpenAI Agents SDK: "

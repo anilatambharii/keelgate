@@ -16,8 +16,8 @@ from typing import TYPE_CHECKING, Any
 from langgraph.checkpoint.base import empty_checkpoint
 from langgraph.checkpoint.sqlite import SqliteSaver
 
-from keelgate.loop.checkpoint import StaleCheckpointError
-from keelgate.loop.state import LoopState
+from keelgate.loop._checkpoint import StaleCheckpointError
+from keelgate.loop._state import LoopState
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
@@ -58,7 +58,7 @@ class LangGraphCheckpointStore:
     processes. :meth:`sqlite` on a real file supplies one (a separate ``<path>.lock`` SQLite file
     held under ``BEGIN IMMEDIATE``). With a saver you build yourself (for example Postgres) and no
     ``process_lock``, the guard is thread-safe only; pass a lock that suits your backend, or use
-    :class:`~keelgate.loop.checkpoint.SqliteCheckpointStore`.
+    :class:`~keelgate.loop._checkpoint.SqliteCheckpointStore`.
     """
 
     def __init__(

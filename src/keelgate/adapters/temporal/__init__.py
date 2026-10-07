@@ -34,14 +34,14 @@ except ImportError as exc:  # pragma: no cover - depends on the extra
     ) from exc
 
 with workflow.unsafe.imports_passed_through():
-    from keelgate.loop.runner import InProcessRunner, LoopOutcome, LoopRunner, LoopSpec
+    from keelgate.loop._runner import InProcessRunner, LoopOutcome, LoopRunner, LoopSpec
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
     from temporalio.client import Client
 
-    from keelgate.loop.engine import Loop
+    from keelgate.loop._engine import Loop
 
 ACTIVITY_NAME: Final = "keelgate_run_loop"
 WORKFLOW_NAME: Final = "KeelgateLoopWorkflow"
@@ -116,7 +116,7 @@ def build_worker(
 
 
 class TemporalRunner:
-    """A :class:`~keelgate.loop.runner.LoopRunner` that starts the loop as a Temporal workflow.
+    """A :class:`~keelgate.loop._runner.LoopRunner` that starts the loop as a Temporal workflow.
 
     The workflow id is derived from the tenant and run id, so starting the same run twice attaches
     to the existing workflow instead of creating a second one.

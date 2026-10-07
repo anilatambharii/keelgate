@@ -21,8 +21,8 @@ from keelgate.loop import (
     find_run,
     replay,
 )
-from keelgate.loop.roles import CallableVerifier, Verdict
-from keelgate.loop.state import ActionOutcome
+from keelgate.loop._roles import CallableVerifier, Verdict
+from keelgate.loop._state import ActionOutcome
 from keelgate.telemetry import attributes as attr
 from keelgate.testing import Reply
 from tests.conftest import MARKET_OPEN, run

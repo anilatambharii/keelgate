@@ -21,8 +21,8 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 
-from keelgate.testing.fake_llm import FakeLLM, Reply
-from keelgate.testing.harness import (
+from keelgate.testing._fake_llm import FakeLLM, Reply
+from keelgate.testing._harness import (
     GovernedHarness,
     ManualClock,
     StaticPolicyEngine,

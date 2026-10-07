@@ -1,15 +1,15 @@
 """Layered memory: working, episodic, semantic and procedural."""
 
-from keelgate.memory.backends import MemoryBackend, PostgresMemoryBackend, SqliteMemoryBackend
-from keelgate.memory.embedder import Embedder, HashEmbedder, cosine
-from keelgate.memory.http_embedders import EmbeddingError, OllamaEmbedder, OpenAICompatibleEmbedder
-from keelgate.memory.tiers import (
+from keelgate.memory._backends import MemoryBackend, PostgresMemoryBackend, SqliteMemoryBackend
+from keelgate.memory._embedder import Embedder, HashEmbedder, cosine
+from keelgate.memory._http_embedders import EmbeddingError, OllamaEmbedder, OpenAICompatibleEmbedder
+from keelgate.memory._tiers import (
     EpisodicMemory,
     ProceduralMemory,
     SemanticMemory,
     WorkingMemory,
 )
-from keelgate.memory.types import (
+from keelgate.memory._types import (
     Attribution,
     ConcurrentWriteError,
     InvalidMemoryWriteError,

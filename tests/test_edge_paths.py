@@ -13,12 +13,12 @@ from typing import Any, ClassVar
 
 import pytest
 
-import keelgate.policy.engine as engine_module
+import keelgate.policy._engine as engine_module
 from keelgate.approvals import ApprovalNotPendingError, ApprovalQueue, ApprovalStatus, ApprovalTier
 from keelgate.audit import AuditError, AuditLog, PostgresAuditStore, genesis_hash, verify_chain
-from keelgate.audit.records import AuditRecord, compute_hash
+from keelgate.audit._records import AuditRecord, compute_hash
 from keelgate.capabilities import GrantInvalidError, GrantSigner, GrantVerifier
-from keelgate.policy.engine import first_expression, pack_path
+from keelgate.policy._engine import first_expression, pack_path
 from tests.conftest import Clock, skip_or_fail
 from tests.test_approvals import human, submit
 from tests.test_audit import PG_DSN, T0, filled

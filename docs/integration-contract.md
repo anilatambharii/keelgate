@@ -197,7 +197,7 @@ through the same path: **registry, grant, policy, approvals, audit**
 
 | Module | Extra | What it provides |
 |---|---|---|
-| `keelgate.adapters.governed` | none | `GovernedToolset`: the one governed path every adapter uses |
+| `keelgate.adapters` | none | `GovernedToolset`: the one governed path every adapter uses |
 | `keelgate.adapters.langgraph` | `langgraph` | `governed_langchain_tools`, `KeelgateChatModel` (async only) |
 | `keelgate.adapters.openai_agents` | `openai` | `governed_function_tools`, `KeelgateModel` (non-streaming) |
 | `keelgate.adapters.claude_agent_sdk` | `anthropic` | `governed_sdk_mcp_server`, `governed_claude_options`: built-in tools off, other MCP servers off, settings off, `can_use_tool` allows only governed tools. Tested **at the boundary**: the CLI cannot run offline |

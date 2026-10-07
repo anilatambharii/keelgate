@@ -67,7 +67,7 @@ TOOL_REPLAYED: Final = "keelgate.tool.idempotent_replay"
 ARGS_HASH: Final = "keelgate.tool.args_sha256"
 
 POLICY_EFFECT: Final = "keelgate.policy.effect"
-POLICY_ENGINE: Final = "keelgate.policy.engine"
+POLICY_ENGINE: Final = "keelgate.policy._engine"
 POLICY_VERSION: Final = "keelgate.policy.version"
 POLICY_REASONS: Final = "keelgate.policy.reasons"
 APPROVAL_TIER: Final = "keelgate.approval.tier"

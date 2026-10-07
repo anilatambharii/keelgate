@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import asyncio
 
-from keelgate.adapters.governed import GovernedToolset
+from keelgate.adapters._governed import GovernedToolset
 from keelgate.adapters.mcp import GovernedMCPServer
 from keelgate.policy import RegoEngine
 from tests.conftest import build_harness

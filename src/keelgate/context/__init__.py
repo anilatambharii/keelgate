@@ -1,6 +1,6 @@
 """As-of-time context assembly. Nothing published after ``as_of`` may enter."""
 
-from keelgate.context.builder import (
+from keelgate.context._builder import (
     FENCE_TOKENS,
     UNTRUSTED_NOTICE,
     AsOfViolationError,
@@ -14,7 +14,7 @@ from keelgate.context.builder import (
     RejectionReason,
     UndatedItemError,
 )
-from keelgate.context.compaction import (
+from keelgate.context._compaction import (
     ExtractiveSummarizer,
     InMemoryRecordStore,
     LLMSummarizer,
@@ -22,14 +22,14 @@ from keelgate.context.compaction import (
     StructuredSummary,
     Summarizer,
 )
-from keelgate.context.item import (
+from keelgate.context._item import (
     HARNESS_KINDS,
     ContextItem,
     ItemKind,
     Provenance,
     Trust,
 )
-from keelgate.context.tokens import ApproxTokenCounter, TokenCounter
+from keelgate.context._tokens import ApproxTokenCounter, TokenCounter
 
 __all__ = [
     "FENCE_TOKENS",

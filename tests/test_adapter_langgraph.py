@@ -17,7 +17,7 @@ from langchain_core.messages import (
 )
 from langgraph.prebuilt import create_react_agent
 
-from keelgate.adapters.governed import UNTRUSTED_KEY, GovernedToolset
+from keelgate.adapters._governed import UNTRUSTED_KEY, GovernedToolset
 from keelgate.adapters.langgraph import (
     KeelgateChatModel,
     governed_langchain_tools,

@@ -16,7 +16,7 @@ from keelgate.loop import (
     SqliteCheckpointStore,
     StaleCheckpointError,
 )
-from keelgate.loop.state import LoopState
+from keelgate.loop._state import LoopState
 from tests.conftest import MARKET_OPEN
 
 

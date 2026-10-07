@@ -38,11 +38,11 @@ from keelgate.evals import (
     to_dict,
     to_html,
 )
-from keelgate.evals import redteam as rt
-from keelgate.evals import trajectory as tj
-from keelgate.evals import unit as ut
-from keelgate.evals.types import CaseResult, MetricResult, SuiteResult
-from keelgate.loop.roles import AcceptAllVerifier
+from keelgate.evals import _redteam as rt
+from keelgate.evals import _trajectory as tj
+from keelgate.evals import _unit as ut
+from keelgate.evals._types import CaseResult, MetricResult, SuiteResult
+from keelgate.loop._roles import AcceptAllVerifier
 from keelgate.testing import Reply, StaticPolicyEngine
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -142,7 +142,7 @@ def test_removing_the_policy_gate_makes_policy_dependent_attacks_succeed() -> No
 def test_removing_fence_escaping_makes_the_breakout_attacks_succeed(
     monkeypatch: pytest.MonkeyPatch, rego_engine: Any
 ) -> None:
-    from keelgate.context import builder
+    from keelgate.context import _builder as builder
 
     class NoEscape:
         def sub(self, repl: str, text: str) -> str:
@@ -196,7 +196,7 @@ def test_every_category_has_a_case_that_can_fail(
     by_id = redteam_results(allow_all)
     broken_categories = {by_id[i].category for i in failing(allow_all)}
 
-    from keelgate.context import builder
+    from keelgate.context import _builder as builder
 
     def lax_add(self: ContextBuilder, item: Any) -> None:
         self.records.put(item)
@@ -274,7 +274,7 @@ def test_a_verifier_that_accepts_everything_misses_every_seeded_fault() -> None:
 
 
 def test_a_paranoid_verifier_is_caught_by_the_false_positive_metric() -> None:
-    from keelgate.loop.roles import Verdict
+    from keelgate.loop._roles import Verdict
 
     class RejectEverything:
         async def verify(self, request: Any) -> Verdict:
