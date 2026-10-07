@@ -20,8 +20,17 @@ from keelgate.evals.metrics import (
     run_metrics,
     sample_records,
 )
-from keelgate.evals.report import baseline_of, compare, to_dict, to_html, write_html, write_json
-from keelgate.evals.runner import SUITES, run_outcome, run_suites
+from keelgate.evals.report import (
+    baseline_of,
+    compare,
+    to_dict,
+    to_html,
+    to_markdown,
+    write_html,
+    write_json,
+    write_markdown,
+)
+from keelgate.evals.runner import SUITES, run_outcome, run_suite, run_suites
 from keelgate.evals.stack import EvalStack
 from keelgate.evals.types import CaseResult, EvalReport, MetricResult, SuiteResult
 
@@ -44,10 +53,13 @@ __all__ = [
     "load_records",
     "run_metrics",
     "run_outcome",
+    "run_suite",
     "run_suites",
     "sample_records",
     "to_dict",
     "to_html",
+    "to_markdown",
     "write_html",
     "write_json",
+    "write_markdown",
 ]

@@ -12,6 +12,9 @@ if TYPE_CHECKING:
     from keelgate.evals.types import CaseResult, EvalReport, SuiteResult
 
 BASELINE_VERSION: Final = 1
+# Floating-point results differ in the last digits between Python versions and platforms; that is
+# noise, not a regression. Anything real is far larger than this.
+EPSILON: Final = 1e-9
 
 
 def to_dict(report: EvalReport) -> dict[str, Any]:
@@ -170,6 +173,35 @@ def to_html(report: EvalReport) -> str:
     )
 
 
+def to_markdown(report: EvalReport) -> str:
+    """A short summary for a CI job page: verdict, per-suite counts, metrics, what failed."""
+    verdict = "PASSED" if report.passed else "FAILED"
+    lines = [
+        f"## Keelgate evals: {verdict}",
+        "",
+        f"mode `{report.mode}` · keelgate {report.version}",
+        "",
+        "| Suite | Result | Cases |",
+        "|---|---|---|",
+    ]
+    for s in report.suites:
+        verb = "blocked" if s.name == "redteam" else "passed"
+        mark = "pass" if s.passed else "FAIL"
+        lines.append(f"| {s.name} | {mark} | {sum(c.passed for c in s.ran)}/{len(s.ran)} {verb} |")
+    if report.metrics:
+        lines += ["", "| Metric | Value | n |", "|---|---|---|"]
+        lines += [f"| `{m.name}` | {m.value:.4f} | {m.n} |" for m in report.metrics]
+    problems = [f"- `{c.suite}/{c.case_id}`: {c.detail}" for c in report.failures]
+    problems += [f"- regression: {r}" for r in report.regressions]
+    if problems:
+        lines += ["", "### Problems", *problems]
+    return "\n".join(lines) + "\n"
+
+
+def write_markdown(report: EvalReport, path: Path) -> None:
+    path.write_text(to_markdown(report), "utf-8")
+
+
 def write_html(report: EvalReport, path: Path) -> None:
     path.write_text(to_html(report), "utf-8")
 
@@ -191,7 +223,11 @@ def baseline_of(report: EvalReport) -> dict[str, Any]:
 
 
 def compare(report: EvalReport, baseline: dict[str, Any], *, tolerance: float = 0.0) -> list[str]:
-    """Every way ``report`` is worse than ``baseline``. Empty means no regression."""
+    """Every way ``report`` is worse than ``baseline``. Empty means no regression.
+
+    ``tolerance`` is the drop you accept in a metric (live models vary). A float-rounding sliver
+    (``EPSILON``) is always accepted.
+    """
     if baseline.get("version") != BASELINE_VERSION:
         return [
             f"the baseline has version {baseline.get('version')!r}, expected {BASELINE_VERSION}"
@@ -217,9 +253,9 @@ def compare(report: EvalReport, baseline: dict[str, Any], *, tolerance: float = 
             problems.append(f"metric {name!r}: in the baseline but not produced")
             continue
         worse = (
-            metric.value < base["value"] - tolerance
+            metric.value < base["value"] - tolerance - EPSILON
             if base.get("higher_is_better", True)
-            else metric.value > base["value"] + tolerance
+            else metric.value > base["value"] + tolerance + EPSILON
         )
         if worse:
             problems.append(

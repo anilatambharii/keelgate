@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import time
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Final
+from typing import TYPE_CHECKING, Any, Final
 
 from keelgate import __version__
 from keelgate.evals.context import EvalContext
@@ -67,6 +67,12 @@ async def run_outcome(
             )
         )
     return suite
+
+
+async def run_suite(name: str, ctx: EvalContext | None = None, **kwargs: Any) -> SuiteResult:
+    """Run one suite by name and return its result."""
+    report = await run_suites([name], ctx, **kwargs)
+    return report.suites[0]
 
 
 async def run_suites(

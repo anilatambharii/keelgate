@@ -75,6 +75,7 @@ def _run(args: argparse.Namespace) -> int:
         run_suites,
         write_html,
         write_json,
+        write_markdown,
     )
 
     names = list(SUITES) if args.suite == "all" else [s.strip() for s in args.suite.split(",")]
@@ -115,6 +116,8 @@ def _run(args: argparse.Namespace) -> int:
         write_json(report, out_dir / "report.json")
     if "html" in formats:
         write_html(report, out_dir / "report.html")
+    if "md" in formats:
+        write_markdown(report, out_dir / "report.md")
     if args.update_baseline and baseline_path is not None:
         if report.failures:
             sys.stderr.write("refusing to write a baseline from a run with failing cases\n")
@@ -208,7 +211,7 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--provider", choices=PROVIDERS, help="live mode: which provider")
     run.add_argument("--model", help="live mode: the model name")
     run.add_argument("--out", default="eval-report", help="directory for report.json / report.html")
-    run.add_argument("--format", default="json,html")
+    run.add_argument("--format", default="json,html", help="json, html, md (comma list)")
     run.add_argument("--baseline", help="a baseline JSON; any regression against it fails the run")
     run.add_argument(
         "--update-baseline", action="store_true", help="write the baseline from this run"

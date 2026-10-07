@@ -690,3 +690,18 @@ def test_sample_records_are_deterministic_and_well_formed() -> None:
     assert a == b and len(a) == 20
     assert all({"p_up", "label"} <= set(r.predicted) and "up" in r.realized for r in a)
     assert dataclasses.is_dataclass(OutcomeRecord) and LoadedMetric("x", None).error == ""
+
+
+def test_run_suite_runs_one_suite_by_name(rego_engine: Any) -> None:
+    from keelgate.evals import run_suite
+
+    result = asyncio.run(run_suite("trajectory"))
+    assert result.name == "trajectory" and result.passed and len(result.cases) == 8
+    with pytest.raises(ValueError, match="unknown suite"):
+        asyncio.run(run_suite("nope"))
+
+
+def test_floating_point_noise_is_not_a_regression_but_a_real_drop_is() -> None:
+    base = baseline_of(synthetic(["A"], metric=0.1615))
+    assert compare(synthetic(["A"], 0.1615 - 1e-12), base) == []  # last-digit noise across Pythons
+    assert compare(synthetic(["A"], 0.1615 - 1e-4), base) != []
