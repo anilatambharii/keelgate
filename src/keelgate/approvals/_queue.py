@@ -22,7 +22,7 @@ import threading
 import uuid
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
-from typing import TYPE_CHECKING, Final
+from typing import TYPE_CHECKING, Final, Protocol
 
 from keelgate.approvals._models import (
     ApprovalRequest,
@@ -104,6 +104,132 @@ CREATE INDEX IF NOT EXISTS approvals_tenant_status ON approvals (tenant_id, stat
 """
 
 
+class ApprovalStore(Protocol):
+    """Where approval requests are persisted (SQLite ships).
+
+    Implement this to keep requests elsewhere, for example in a database that enforces tenant
+    isolation itself. The queue enforces every approval rule; a store only keeps rows. ``swap``
+    must be an atomic compare-and-swap on status, and a request of another tenant must read as
+    absent.
+    """
+
+    def insert(self, request: ApprovalRequest) -> None:
+        """Persist a new request."""
+        ...
+
+    def get(self, tenant_id: str, request_id: str) -> ApprovalRequest | None:
+        """The tenant request, or ``None`` if there is no such request for that tenant."""
+        ...
+
+    def swap(self, request: ApprovalRequest, *, expect: ApprovalStatus) -> bool:
+        """Replace the stored request only if its status is still ``expect``."""
+        ...
+
+    def list_pending(self, tenant_id: str) -> list[ApprovalRequest]:
+        """The tenant requests whose stored status is PENDING, oldest first."""
+        ...
+
+    def close(self) -> None:
+        """Release the store resources."""
+        ...
+
+
+class ApprovalBackend(Protocol):
+    """What the tool gateway needs from an approval queue: submit, look up, and spend.
+
+    :class:`ApprovalQueue` is the local implementation. A remote queue (a hosted control plane,
+    for instance) implements the same three calls.
+    """
+
+    def submit(
+        self,
+        *,
+        tenant_id: str,
+        agent_id: str,
+        tool_name: str,
+        args_hash: str,
+        tier: ApprovalTier,
+        evidence: EvidenceBundle,
+        ttl: timedelta | None = None,
+    ) -> ApprovalRequest:
+        """Park an action for a human and return the pending request."""
+        ...
+
+    def get(self, tenant_id: str, request_id: str) -> ApprovalRequest:
+        """The tenant request, or raise :class:`ApprovalNotFoundError`."""
+        ...
+
+    def consume(
+        self,
+        *,
+        tenant_id: str,
+        request_id: str,
+        agent_id: str,
+        tool_name: str,
+        args_hash: str,
+    ) -> ApprovalRequest:
+        """Spend an approved request, once, for exactly this action."""
+        ...
+
+
+class SqliteApprovalStore:
+    """The default :class:`ApprovalStore`: one SQLite database, in memory unless given a path."""
+
+    def __init__(self, path: str | Path = ":memory:") -> None:
+        self._lock = threading.RLock()
+        self._conn = sqlite3.connect(str(path), check_same_thread=False, isolation_level=None)
+        if str(path) != ":memory:":
+            self._conn.execute("PRAGMA journal_mode=WAL")
+        self._conn.executescript(_SCHEMA)
+
+    def insert(self, request: ApprovalRequest) -> None:
+        with self._lock:
+            self._conn.execute(
+                "INSERT INTO approvals (request_id, tenant_id, status, expires_at, body) "
+                "VALUES (?,?,?,?,?)",
+                (
+                    request.request_id,
+                    request.tenant_id,
+                    request.status.value,
+                    request.expires_at.isoformat(),
+                    request.model_dump_json(),
+                ),
+            )
+
+    def get(self, tenant_id: str, request_id: str) -> ApprovalRequest | None:
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT body FROM approvals WHERE request_id = ? AND tenant_id = ?",
+                (request_id, tenant_id),
+            ).fetchone()
+        return None if row is None else ApprovalRequest.model_validate_json(row[0])
+
+    def swap(self, request: ApprovalRequest, *, expect: ApprovalStatus) -> bool:
+        with self._lock:
+            cursor = self._conn.execute(
+                "UPDATE approvals SET status = ?, body = ? WHERE request_id = ? AND status = ?",
+                (
+                    request.status.value,
+                    request.model_dump_json(),
+                    request.request_id,
+                    expect.value,
+                ),
+            )
+        return cursor.rowcount == 1
+
+    def list_pending(self, tenant_id: str) -> list[ApprovalRequest]:
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT body FROM approvals WHERE tenant_id = ? AND status = ? ORDER BY rowid",
+                (tenant_id, ApprovalStatus.PENDING.value),
+            ).fetchall()
+        return [ApprovalRequest.model_validate_json(row[0]) for row in rows]
+
+    def close(self) -> None:
+        with self._lock:
+            self._conn.close()
+
+
 class ApprovalQueue:
     """The human-in-the-loop approval queue (SQLite-backed).
 
@@ -115,6 +241,7 @@ class ApprovalQueue:
         self,
         path: str | Path = ":memory:",
         *,
+        store: ApprovalStore | None = None,
         audit: AuditLog | None = None,
         clock: Clock = _utc_now,
         default_ttl: timedelta = DEFAULT_TTL,
@@ -125,10 +252,7 @@ class ApprovalQueue:
         self._clock = clock
         self._default_ttl = default_ttl
         self._lock = threading.RLock()
-        self._conn = sqlite3.connect(str(path), check_same_thread=False, isolation_level=None)
-        if str(path) != ":memory:":
-            self._conn.execute("PRAGMA journal_mode=WAL")
-        self._conn.executescript(_SCHEMA)
+        self._store_: ApprovalStore = store if store is not None else SqliteApprovalStore(path)
 
     # ------------------------------------------------------------- submission
 
@@ -170,17 +294,7 @@ class ApprovalQueue:
             expires_at=now + (ttl or self._default_ttl),
         )
         with self._lock:
-            self._conn.execute(
-                "INSERT INTO approvals (request_id, tenant_id, status, expires_at, body) "
-                "VALUES (?,?,?,?,?)",
-                (
-                    request.request_id,
-                    tenant_id,
-                    request.status.value,
-                    request.expires_at.isoformat(),
-                    request.model_dump_json(),
-                ),
-            )
+            self._store_.insert(request)
         self._record(
             EventType.APPROVAL_REQUESTED,
             tenant_id,
@@ -205,12 +319,8 @@ class ApprovalQueue:
 
     def list_pending(self, tenant_id: str) -> list[ApprovalRequest]:
         with self._lock:
-            rows = self._conn.execute(
-                "SELECT request_id FROM approvals WHERE tenant_id = ? AND status = ? "
-                "ORDER BY rowid",
-                (tenant_id, ApprovalStatus.PENDING.value),
-            ).fetchall()
-            loaded = [self._load(tenant_id, row[0]) for row in rows]
+            pending = self._store_.list_pending(tenant_id)
+            loaded = [self._load(tenant_id, r.request_id) for r in pending]
         return [r for r in loaded if r.status is ApprovalStatus.PENDING]
 
     # -------------------------------------------------------------- decisions
@@ -298,18 +408,14 @@ class ApprovalQueue:
 
     def close(self) -> None:
         with self._lock:
-            self._conn.close()
+            self._store_.close()
 
     # --------------------------------------------------------------- internals
 
     def _load(self, tenant_id: str, request_id: str) -> ApprovalRequest:
-        row = self._conn.execute(
-            "SELECT body FROM approvals WHERE request_id = ? AND tenant_id = ?",
-            (request_id, tenant_id),
-        ).fetchone()
-        if row is None:
+        request = self._store_.get(tenant_id, request_id)
+        if request is None:
             raise ApprovalNotFoundError("no such approval request")
-        request = ApprovalRequest.model_validate_json(row[0])
         if (
             request.status in (ApprovalStatus.PENDING, ApprovalStatus.APPROVED)
             and self._clock() >= request.expires_at
@@ -376,11 +482,7 @@ class ApprovalQueue:
 
     def _store(self, request: ApprovalRequest, *, expect: ApprovalStatus) -> None:
         """Compare-and-swap on status: a stale writer changes nothing."""
-        cursor = self._conn.execute(
-            "UPDATE approvals SET status = ?, body = ? WHERE request_id = ? AND status = ?",
-            (request.status.value, request.model_dump_json(), request.request_id, expect.value),
-        )
-        if cursor.rowcount != 1:
+        if not self._store_.swap(request, expect=expect):
             raise ApprovalNotPendingError("approval request changed concurrently")
 
     def _record(

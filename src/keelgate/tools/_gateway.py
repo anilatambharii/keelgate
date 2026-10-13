@@ -32,8 +32,8 @@ from opentelemetry.trace import Status, StatusCode
 from pydantic import BaseModel, ValidationError
 
 from keelgate.approvals import (
+    ApprovalBackend,
     ApprovalError,
-    ApprovalQueue,
     EvidenceBundle,
     EvidenceSource,
     action_hash,
@@ -140,7 +140,7 @@ class ToolGateway:
         verifier: GrantVerifier,
         engine: PolicyEngine,
         audit: AuditLog,
-        approvals: ApprovalQueue | None = None,
+        approvals: ApprovalBackend | None = None,
         ledger: BudgetLedger | None = None,
         idempotency: IdempotencyStore | None = None,
         allowed_modes: frozenset[str] = PAPER_MODES,
