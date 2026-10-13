@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "keelgate"
-version = "0.1.0"
+version = "0.2.0"
 description = "Safety-first agent harness for AI agents that touch money and regulated actions. The LLM proposes; deterministic code decides."
 readme = "README.md"
 requires-python = ">=3.11"
