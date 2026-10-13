@@ -305,3 +305,27 @@ jobs:
         if: always()
         working-directory: .
         run: docker compose -f docker-compose.dev.yml --profile cloud down -v
+
+  dashboard:
+    # Keelgate Cloud's dashboard (proprietary, ee/dashboard): types, lint, unit tests, production build.
+    name: dashboard (typecheck, lint, test, build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ee/dashboard
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: ee/dashboard/package-lock.json
+
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
