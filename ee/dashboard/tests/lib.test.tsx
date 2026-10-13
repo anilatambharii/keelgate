@@ -169,7 +169,7 @@ describe("SignupForm", () => {
     await user.click(screen.getByRole("button", { name: "Create organisation" }));
     expect(await screen.findByText(/already exists/)).toBeInTheDocument();
     expect(authRequest).toHaveBeenCalledWith("/auth/signup", {
-      org_name: "Acme", email: "a@acme.io", password: "twelve-chars-ok",
+      org_name: "Acme", email: "a@acme.io", password: "twelve-chars-ok", // pragma: allowlist secret
     });
   });
 });

@@ -43,9 +43,17 @@ def verify_password(password: str, stored: str | None) -> bool:
         return False
 
 
+_TOKEN_HASH_CONTEXT: Final = b"keelgate-cloud/token-hash/v1"
+
+
 def sha256_hex(value: str) -> str:
-    """Hex SHA-256. Tokens carry 256 bits of randomness, so an unsalted fast hash is sufficient."""
-    return hashlib.sha256(value.encode()).hexdigest()
+    """Hex digest for looking up a token (an API key, a session token, a login e-mail).
+
+    These values are 256-bit random tokens, so a fast hash is the right tool (a slow password hash
+    would only cost every request time); passwords use Argon2 above. It is an HMAC under a fixed
+    context string so the digests cannot be confused with a plain SHA-256 of the same text.
+    """
+    return hmac.new(_TOKEN_HASH_CONTEXT, value.encode(), hashlib.sha256).hexdigest()
 
 
 def new_api_key() -> tuple[str, str, str]:

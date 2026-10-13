@@ -270,7 +270,12 @@ def source_hash(files: dict[str, str]) -> str:
     return hash_sources(files)
 
 
+_PATH_BEFORE_REGO = re.compile(r"(?:[A-Za-z]:)?[^\s:'\"]*[\\/]([^\\/\s:'\"]+\.rego)")
+
+
 def _clip(text: str) -> str:
+    """A compiler message that is safe to show: no server paths, bounded length."""
+    text = _PATH_BEFORE_REGO.sub(r"\1", text)
     return text if len(text) <= MAX_ERROR_CHARS else text[:MAX_ERROR_CHARS] + "... (truncated)"
 
 

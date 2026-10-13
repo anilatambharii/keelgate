@@ -20,6 +20,7 @@ from psycopg.types.json import Jsonb
 
 from keelgate_cloud import policy_registry as reg
 from keelgate_cloud.db import Database
+from keelgate_cloud.policy_registry import _clip
 from tests.harness import Org, live_server, make_app
 
 QUERY = "data.acme.mini.decision"
@@ -701,3 +702,10 @@ def test_the_request_time_budget_fails_the_remaining_cases(
         headers=org.auth,
     ).json()
     assert all(r["passed"] is False and "budget" in r["error"] for r in out["results"])
+
+
+def test_compile_errors_do_not_reveal_server_paths() -> None:
+    windows = r"parse error: C:\Users\svc\Temp\keelgate-registry-ab\p.rego:3: bad"
+    posix = "parse error: /tmp/keelgate-registry-q/pack.rego:7: bad"
+    assert _clip(windows) == "parse error: p.rego:3: bad"
+    assert _clip(posix) == "parse error: pack.rego:7: bad"
