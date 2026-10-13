@@ -36,6 +36,7 @@ CONTRACT_MODULES = [
 SUBPACKAGES = [
     "keelgate.llm.providers",
     "keelgate._internal",
+    "keelgate.cloud",
 ]
 
 ADAPTER_MODULES = [

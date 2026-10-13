@@ -1,0 +1,25 @@
+{
+  "id": "__EVENT__",
+  "object": "event",
+  "api_version": "2025-09-30.clover",
+  "created": 1760000000,
+  "livemode": false,
+  "pending_webhooks": 1,
+  "request": {
+    "id": null,
+    "idempotency_key": null
+  },
+  "type": "invoice.paid",
+  "data": {
+    "object": {
+      "id": "in_test_1",
+      "object": "invoice",
+      "customer": "__CUSTOMER__",
+      "subscription": "__SUB__",
+      "status": "paid",
+      "amount_paid": 49900,
+      "amount_due": 49900,
+      "currency": "usd"
+    }
+  }
+}

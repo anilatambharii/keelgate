@@ -261,3 +261,71 @@ jobs:
       - name: Tear down
         if: always()
         run: docker compose -f docker-compose.dev.yml down -v
+
+  control-plane:
+    # Keelgate Cloud's control plane (proprietary, ee/control_plane). Needs a real Postgres: its
+    # tenant isolation is row-level security, which only a real database can prove.
+    name: control plane (Postgres RLS + stripe-mock)
+    runs-on: ubuntu-latest
+    env:
+      KEELGATE_REQUIRE_INTEGRATION: "1"
+    defaults:
+      run:
+        working-directory: ee/control_plane
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7  # v10.2.0
+        with:
+          python-version: "3.11"
+          enable-cache: true
+          cache-dependency-glob: "ee/control_plane/uv.lock"
+
+      - run: uv sync --frozen
+
+      - name: Lint, format, types
+        run: |
+          uv run ruff check src tests
+          uv run ruff format --check src tests
+          uv run mypy src
+
+      - name: Start Postgres and stripe-mock
+        working-directory: .
+        run: docker compose -f docker-compose.dev.yml --profile cloud up -d --wait postgres stripe-mock
+
+      - name: Tests
+        run: uv run pytest -q -rs -p no:cacheprovider
+
+      - name: Service logs
+        if: failure()
+        working-directory: .
+        run: docker compose -f docker-compose.dev.yml --profile cloud logs --no-color
+
+      - name: Tear down
+        if: always()
+        working-directory: .
+        run: docker compose -f docker-compose.dev.yml --profile cloud down -v
+
+  dashboard:
+    # Keelgate Cloud's dashboard (proprietary, ee/dashboard): types, lint, unit tests, production build.
+    name: dashboard (typecheck, lint, test, build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ee/dashboard
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: ee/dashboard/package-lock.json
+
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build

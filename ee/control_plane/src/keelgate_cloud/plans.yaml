@@ -1,0 +1,78 @@
+# Plans are configuration, not code. `keelgate-cloud sync-stripe` creates Stripe products and
+# prices from this file; the control plane enforces the limits below.
+#
+# Fields
+#   price_monthly_cents     recurring base price in US cents (null = no Stripe price: free/custom)
+#   included_gated_actions  gated actions included per calendar month (null = not capped)
+#   overage                 "block" stops gated actions at the cap; a number is the price in US
+#                           cents per extra action (not set anywhere yet: see docs/cloud/billing.md)
+#   trace_retention_days    how long traces are kept (null = set per contract)
+#   audit_min_retention_days  audit records are guaranteed to be kept at least this long
+#   audit_immutable         the audit log cannot be altered or deleted by anyone, tenants included
+#   max_agents              distinct agent ids per org (null = unlimited)
+#   rate_limit_per_minute   API requests per key per minute
+#   features                capability switches; "sso" gates OIDC single sign-on
+#   trial_days              Stripe trial length for self-serve plans
+#
+# Values marked "assumed" were not in the commercial brief and are the owner's to confirm.
+
+plans:
+  community:
+    name: Community
+    description: Self-hosted, free. Not served by the hosted control plane.
+    hosted: false
+    price_monthly_cents: null
+    included_gated_actions: null
+    overage: block
+    trace_retention_days: null
+    audit_min_retention_days: null
+    audit_immutable: false
+    max_agents: null
+    rate_limit_per_minute: 0
+    features: []
+    trial_days: 0
+
+  team:
+    name: Team
+    description: Hosted control plane for small teams.
+    hosted: true
+    price_monthly_cents: 49900
+    included_gated_actions: 1000000
+    overage: block            # assumed: no overage price was specified, so the cap is a hard stop
+    trace_retention_days: 30
+    audit_min_retention_days: 30   # assumed
+    audit_immutable: false
+    max_agents: 10            # assumed: the brief says only Business is "unlimited agents"
+    rate_limit_per_minute: 600  # assumed
+    features: [sso]
+    trial_days: 14            # assumed
+
+  business:
+    name: Business
+    description: Unlimited agents, one-year immutable audit, compliance exports, 99.9% SLA.
+    hosted: true
+    price_monthly_cents: 250000
+    included_gated_actions: null   # assumed: no action cap was specified
+    overage: block
+    trace_retention_days: 365      # assumed
+    audit_min_retention_days: 365
+    audit_immutable: true
+    max_agents: null
+    rate_limit_per_minute: 3000    # assumed
+    features: [sso, compliance_exports, sla_99_9]
+    trial_days: 14                 # assumed
+
+  enterprise:
+    name: Enterprise
+    description: VPC or on-prem deployment and custom policy packs. Sold by contract.
+    hosted: true
+    price_monthly_cents: null
+    included_gated_actions: null
+    overage: block
+    trace_retention_days: null
+    audit_min_retention_days: null
+    audit_immutable: true
+    max_agents: null
+    rate_limit_per_minute: 10000   # assumed
+    features: [sso, compliance_exports, sla_99_9, custom_policy_packs, private_deployment]
+    trial_days: 0

@@ -86,6 +86,17 @@ services:
     # No healthcheck: this image ships no shell or HTTP client to probe itself
     # with. `make health` probes :16686 and :14269 from the host instead.
 
+  stripe-mock:
+    # Stripe's own API mock: validates request shapes against Stripe's OpenAPI spec and returns
+    # canned objects. Test mode only; no account or keys needed (any sk_test_ key works). The
+    # control-plane billing tests and `python -m keelgate_cloud sync-stripe` talk to it.
+    image: stripe/stripe-mock:latest
+    container_name: keelgate-stripe-mock
+    profiles: ["cloud"]
+    ports:
+      - "12111:12111"
+      - "12112:12112"
+
   opa-tools:
     # One-shot OPA CLI for `make policy-test` / `make policy-lint`. The `tools` profile
     # keeps it out of `make up`; run it with `docker compose run --rm opa-tools <args>`.

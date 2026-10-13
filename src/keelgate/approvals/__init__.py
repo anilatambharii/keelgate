@@ -14,6 +14,7 @@ from keelgate.approvals._models import (
     sanitize_for_display,
 )
 from keelgate.approvals._queue import (
+    ApprovalBackend,
     ApprovalError,
     ApprovalExpiredError,
     ApprovalNotAuthorisedError,
@@ -22,10 +23,13 @@ from keelgate.approvals._queue import (
     ApprovalNotUsableError,
     ApprovalQueue,
     ApprovalSignoffError,
+    ApprovalStore,
+    SqliteApprovalStore,
 )
 from keelgate.approvals._tiers import ApprovalTier
 
 __all__ = [
+    "ApprovalBackend",
     "ApprovalError",
     "ApprovalExpiredError",
     "ApprovalNotAuthorisedError",
@@ -36,10 +40,12 @@ __all__ = [
     "ApprovalRequest",
     "ApprovalSignoffError",
     "ApprovalStatus",
+    "ApprovalStore",
     "ApprovalTier",
     "Approver",
     "EvidenceBundle",
     "EvidenceSource",
+    "SqliteApprovalStore",
     "action_hash",
     "sanitize_for_display",
 ]

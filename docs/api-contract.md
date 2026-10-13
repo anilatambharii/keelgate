@@ -14,7 +14,7 @@ A change to this file in a pull request *is* a change to the public API.
 | `keelgate.capabilities` | 23 | 2 |
 | `keelgate.policy` | 14 | 0 |
 | `keelgate.audit` | 11 | 1 |
-| `keelgate.approvals` | 16 | 0 |
+| `keelgate.approvals` | 16 | 3 |
 | `keelgate.loop` | 32 | 21 |
 | `keelgate.context` | 25 | 0 |
 | `keelgate.memory` | 13 | 8 |
@@ -30,6 +30,7 @@ A change to this file in a pull request *is* a change to the public API.
 | `keelgate.adapters.claude_agent_sdk` | 0 | 4 |
 | `keelgate.adapters.a2a` | 0 | 10 |
 | `keelgate.adapters.temporal` | 0 | 7 |
+| `keelgate.cloud` | 0 | 11 |
 | `keelgate` | 1 | 0 |
 | `keelgate.cli` | 0 | 2 |
 | `keelgate.approvals.cli` | 0 | 1 |
@@ -38,7 +39,7 @@ A change to this file in a pull request *is* a change to the public API.
 | `keelgate.loop.langgraph_store` | 0 | 1 |
 | `keelgate.testing.plugin` | 0 | 4 |
 | `keelgate.telemetry.attributes` | 0 | 54 |
-| **total** | **194** | **172** |
+| **total** | **194** | **186** |
 
 ## `keelgate.tools`
 
@@ -104,7 +105,7 @@ class Tool(spec: ToolSpec, fn: Callable[..., Any]) -> None
     property name
 exception ToolDefinitionError(ValueError)(...)
 model ToolError(*, code: ErrorCode, message: str, retryable: bool = False, hint: str = '', details: dict[str, Any] = ...) -> None
-class ToolGateway(*, registry: ToolRegistry, verifier: GrantVerifier, engine: PolicyEngine, audit: AuditLog, approvals: ApprovalQueue | None = None, ledger: BudgetLedger | None = None, idempotency: IdempotencyStore | None = None, allowed_modes: frozenset[str] = frozenset({'paper', 'simulation'})) -> None
+class ToolGateway(*, registry: ToolRegistry, verifier: GrantVerifier, engine: PolicyEngine, audit: AuditLog, approvals: ApprovalBackend | None = None, ledger: BudgetLedger | None = None, idempotency: IdempotencyStore | None = None, allowed_modes: frozenset[str] = frozenset({'paper', 'simulation'})) -> None
     async call(*, tool_name: str, arguments: Mapping[str, Any], grant_token: str, context: CallContext) -> ToolOutcome
 class ToolOutcome(status: OutcomeStatus, tool: str, call_id: str, output: Untrusted[BaseModel] | None = None, error: ToolError | None = None, approval_id: str | None = None, approval_tier: ApprovalTier | None = None, policy: PolicyDecision | None = None, replayed: bool = False, audit_seq: int | None = None) -> None
     for_model() -> dict[str, Any]
@@ -324,6 +325,7 @@ Human-in-the-loop approval requests and the queue that serves them.
 
 | Symbol | Kind | Stability | Summary |
 |---|---|---|---|
+| `ApprovalBackend` | protocol | provisional | What the tool gateway needs from an approval queue: submit, look up, and spend. |
 | `ApprovalError` | exception | stable | Base class. |
 | `ApprovalExpiredError` | exception | stable | The approval request expired before it was decided or used. |
 | `ApprovalNotAuthorisedError` | exception | stable | The approver may not decide this request: wrong tenant, tier too low, or the requester itself. |
@@ -334,23 +336,29 @@ Human-in-the-loop approval requests and the queue that serves them.
 | `ApprovalRequest` | model | stable | A call parked for a human: the exact arguments' hash, the tier required, the evidence bundle, and the request's status and decision. |
 | `ApprovalSignoffError` | exception | stable | An explicit sign-off was required and the code supplied was missing or wrong. |
 | `ApprovalStatus` | enum | stable | Where an approval request is: pending, approved, rejected, expired or consumed. |
+| `ApprovalStore` | protocol | provisional | Where approval requests are persisted (SQLite ships). |
 | `ApprovalTier` | enum | stable | How much human attention an action needs. |
 | `Approver` | model | stable | A human cleared to decide requests in one tenant up to ``max_tier``. |
 | `EvidenceBundle` | model | stable | What an approver needs to decide, and what their decision is bound to. |
 | `EvidenceSource` | model | stable | A source cited in an approval's evidence: where it came from, when it was retrieved, and a hash of its content. |
+| `SqliteApprovalStore` | class | provisional | The default :class:`ApprovalStore`: one SQLite database, in memory unless given a path. |
 | `action_hash` | function | stable | Hash of exactly what will run. |
 | `sanitize_for_display` | function | stable | Strip control characters so model-derived text cannot drive a terminal. |
 
 <details><summary>Signatures</summary>
 
 ```text
+protocol ApprovalBackend
+    consume(*, tenant_id: str, request_id: str, agent_id: str, tool_name: str, args_hash: str) -> ApprovalRequest
+    get(tenant_id: str, request_id: str) -> ApprovalRequest
+    submit(*, tenant_id: str, agent_id: str, tool_name: str, args_hash: str, tier: ApprovalTier, evidence: EvidenceBundle, ttl: timedelta | None = None) -> ApprovalRequest
 exception ApprovalError(Exception)(...)
 exception ApprovalExpiredError(ApprovalError)(...)
 exception ApprovalNotAuthorisedError(ApprovalError)(...)
 exception ApprovalNotFoundError(ApprovalError)(...)
 exception ApprovalNotPendingError(ApprovalError)(...)
 exception ApprovalNotUsableError(ApprovalError)(...)
-class ApprovalQueue(path: str | Path = ':memory:', *, audit: AuditLog | None = None, clock: Clock = ..., default_ttl: timedelta = ...) -> None
+class ApprovalQueue(path: str | Path = ':memory:', *, store: ApprovalStore | None = None, audit: AuditLog | None = None, clock: Clock = ..., default_ttl: timedelta = ...) -> None
     approve(tenant_id: str, request_id: str, approver: Approver, *, signoff_code: str | None = None, note: str | None = None) -> ApprovalRequest
     close() -> None
     consume(*, tenant_id: str, request_id: str, agent_id: str, tool_name: str, args_hash: str) -> ApprovalRequest
@@ -362,11 +370,23 @@ model ApprovalRequest(*, request_id: str, tenant_id: str, agent_id: str, tool_na
     property signoff_code
 exception ApprovalSignoffError(ApprovalError)(...)
 enum ApprovalStatus: PENDING='PENDING', APPROVED='APPROVED', REJECTED='REJECTED', EXPIRED='EXPIRED', CONSUMED='CONSUMED'
+protocol ApprovalStore
+    close() -> None
+    get(tenant_id: str, request_id: str) -> ApprovalRequest | None
+    insert(request: ApprovalRequest) -> None
+    list_pending(tenant_id: str) -> list[ApprovalRequest]
+    swap(request: ApprovalRequest, *, expect: ApprovalStatus) -> bool
 enum ApprovalTier: AUTO='AUTO', ONE_CLICK='ONE_CLICK', EXPLICIT_SIGNOFF='EXPLICIT_SIGNOFF'
 model Approver(*, approver_id: Annotated[str, MinLen(min_length=1), MaxLen(max_length=128)], tenant_id: Annotated[str, MinLen(min_length=1), MaxLen(max_length=128)], max_tier: ApprovalTier = <ApprovalTier.ONE_CLICK: 'ONE_CLICK'>) -> None
 model EvidenceBundle(*, tool: str, args: dict[str, Any], rationale: Annotated[str, MaxLen(max_length=4000)], sources: tuple[EvidenceSource, ...] = (), confidence: Annotated[float | None, Ge(ge=0), Le(le=1), _PydanticGeneralMetadata(allow_inf_nan=False)] = None, verifier_flags: tuple[str, ...] = (), policy_reasons: tuple[str, ...] = (), policy_version: str = '') -> None
     digest() -> str
 model EvidenceSource(*, uri: Annotated[str, MaxLen(max_length=2048)], title: Annotated[str | None, MaxLen(max_length=300)] = None, retrieved_at: datetime.datetime | None = None, sha256: Annotated[str | None, _PydanticGeneralMetadata(pattern='^[0-9a-f]{64}$')] = None) -> None
+class SqliteApprovalStore(path: str | Path = ':memory:') -> None
+    close() -> None
+    get(tenant_id: str, request_id: str) -> ApprovalRequest | None
+    insert(request: ApprovalRequest) -> None
+    list_pending(tenant_id: str) -> list[ApprovalRequest]
+    swap(request: ApprovalRequest, *, expect: ApprovalStatus) -> bool
 def action_hash(tool: str, args: dict[str, Any]) -> str
 def sanitize_for_display(text: str) -> str
 ```
@@ -469,7 +489,7 @@ class LLMPlanner(llm: LLMClient, model: str, *, max_tokens: int = 1024, max_acti
     async plan(request: PlanRequest) -> Plan
 class LLMVerifier(llm: LLMClient, model: str, *, max_tokens: int = 300) -> None
     async verify(request: VerifyRequest) -> Verdict
-class Loop(*, gateway: ToolCaller, registry: ToolRegistry, planner: Planner, checkpoints: CheckpointStore, grant_token: str | Callable[[], str], policy_context: Callable[[datetime], PolicyContext], stop: StopConditions | None = None, verifier: Verifier | None = None, audit: AuditLog | None = None, approvals: ApprovalQueue | None = None, episodic: EpisodicMemory | None = None, context_sources: Sequence[ContextSource] = (), context_budget: int = 8000, system_prompt: str = 'You are an agent working toward the goal below. Use the offered tools to gather information and to act. When the goal is met, reply with a final answer in plain text and no tool call. Some actions need human approval or may be refused; if one is, do not try another route to the same effect.', counter: TokenCounter | None = None, pricing: PricingTable | None = None, price_model: str = '', confirmer: OutcomeConfirmer | None = None, summarizer: Summarizer | None = None, clock: Callable[[], datetime] = ..., allowed_side_effects: frozenset[SideEffect] | None = None, loop_type: LoopType = <LoopType.TASK: 'task'>, failpoint: Callable[[str], None] | None = None) -> None
+class Loop(*, gateway: ToolCaller, registry: ToolRegistry, planner: Planner, checkpoints: CheckpointStore, grant_token: str | Callable[[], str], policy_context: Callable[[datetime], PolicyContext], stop: StopConditions | None = None, verifier: Verifier | None = None, audit: AuditLog | None = None, approvals: ApprovalBackend | None = None, episodic: EpisodicMemory | None = None, context_sources: Sequence[ContextSource] = (), context_budget: int = 8000, system_prompt: str = 'You are an agent working toward the goal below. Use the offered tools to gather information and to act. When the goal is met, reply with a final answer in plain text and no tool call. Some actions need human approval or may be refused; if one is, do not try another route to the same effect.', counter: TokenCounter | None = None, pricing: PricingTable | None = None, price_model: str = '', confirmer: OutcomeConfirmer | None = None, summarizer: Summarizer | None = None, clock: Callable[[], datetime] = ..., allowed_side_effects: frozenset[SideEffect] | None = None, loop_type: LoopType = <LoopType.TASK: 'task'>, failpoint: Callable[[str], None] | None = None) -> None
     async reconcile(tenant_id: str, run_id: str, action_id: str, *, executed: bool, by: str, note: str = '') -> LoopState
     async resume(tenant_id: str, run_id: str, *, stop: StopConditions | None = None) -> LoopResult
     async run(*, goal: str, tenant_id: str, agent_id: str, as_of: datetime, run_id: str | None = None, trace_id: str | None = None, stop: StopConditions | None = None) -> LoopResult
@@ -1229,6 +1249,60 @@ def build_worker(client: Client, loop_factory: Callable[[], Loop], *, task_queue
 
 </details>
 
+## `keelgate.cloud`
+
+Use a hosted control plane from a Keelgate agent.
+
+| Symbol | Kind | Stability | Summary |
+|---|---|---|---|
+| `CloudApprovalError` | exception | provisional | The approval service could not be reached or refused the request. |
+| `CloudApprovalQueue` | class | provisional | Park actions in the control plane's approvals inbox and spend them from there. |
+| `CloudAuditError` | exception | provisional | The control plane could not durably record an audit event. |
+| `CloudAuditStore` | class | provisional | Append audit events on the control plane, which chains and stores them. |
+| `CloudAuthError` | exception | provisional | The API key was rejected (missing, wrong, revoked or expired). |
+| `CloudClient` | class | provisional | A small synchronous client for the control plane's agent-facing API. |
+| `CloudError` | exception | provisional | The control plane refused a request or could not be reached. |
+| `CloudPolicyEngine` | class | provisional | Fetch a tenant's deployed policy pack and decide with it, locally. |
+| `CloudQuotaError` | exception | provisional | The plan quota or a rate limit stopped the request. |
+| `CloudSpanExporter` | class | provisional | An OpenTelemetry span exporter for the control plane. |
+| `PolicyPackError` | exception | provisional | The registry returned a pack that is malformed or does not match its declared hash. |
+
+<details><summary>Signatures</summary>
+
+```text
+exception CloudApprovalError(ApprovalError)(...)
+class CloudApprovalQueue(client: CloudClient) -> None
+    close() -> None
+    consume(*, tenant_id: str, request_id: str, agent_id: str, tool_name: str, args_hash: str) -> ApprovalRequest
+    get(tenant_id: str, request_id: str) -> ApprovalRequest
+    list_pending(tenant_id: str) -> list[ApprovalRequest]
+    submit(*, tenant_id: str, agent_id: str, tool_name: str, args_hash: str, tier: ApprovalTier, evidence: EvidenceBundle, ttl: timedelta | None = None) -> ApprovalRequest
+exception CloudAuditError(AuditError)(message: str, *, code: str = 'cloud_error') -> None
+class CloudAuditStore(client: CloudClient) -> None
+    append(tenant_id: str, build: BuildRecord) -> AuditRecord
+    close() -> None
+    head(tenant_id: str) -> ChainHead | None
+    iter_records(tenant_id: str, *, after_seq: int = 0) -> Iterator[AuditRecord]
+exception CloudAuthError(CloudError)(message: str, *, code: str = 'cloud_error', status: int | None = None)
+class CloudClient(base_url: str, api_key: str, *, timeout_s: float = 10.0, transport: httpx.BaseTransport | None = None) -> None
+    close() -> None
+    request(method: str, path: str, *, json: Any = None, params: Mapping[str, Any] | None = None, idempotency_key: str | None = None) -> Any
+    whoami() -> dict[str, Any]
+exception CloudError(Exception)(message: str, *, code: str = 'cloud_error', status: int | None = None)
+class CloudPolicyEngine(client: CloudClient, pack_name: str) -> None
+    async decide(policy_input: PolicyInput) -> PolicyDecision
+    classmethod from_registry(client: CloudClient, pack_name: str) -> CloudPolicyEngine
+    refresh() -> str
+exception CloudQuotaError(CloudError)(message: str, *, code: str = 'cloud_error', status: int | None = None)
+class CloudSpanExporter(SpanExporter)(client: CloudClient) -> None
+    export(spans: Sequence[ReadableSpan]) -> SpanExportResult
+    force_flush(timeout_millis: int = 30000) -> bool
+    shutdown() -> None
+exception PolicyPackError(Exception)(...)
+```
+
+</details>
+
 ## `keelgate`
 
 Keelgate — a safety-first agent harness for AI agents that touch money.
@@ -1240,7 +1314,7 @@ Keelgate — a safety-first agent harness for AI agents that touch money.
 <details><summary>Signatures</summary>
 
 ```text
-__version__ = '0.1.0'
+__version__ = '0.2.0'
 ```
 
 </details>

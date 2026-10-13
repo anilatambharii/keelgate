@@ -67,7 +67,7 @@ from keelgate.tools._spec import SideEffect
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping, Sequence
 
-    from keelgate.approvals._queue import ApprovalQueue
+    from keelgate.approvals._queue import ApprovalBackend
     from keelgate.audit._log import AuditLog
     from keelgate.context._compaction import Summarizer
     from keelgate.context._tokens import TokenCounter
@@ -196,7 +196,7 @@ class Loop:
         stop: StopConditions | None = None,
         verifier: Verifier | None = None,
         audit: AuditLog | None = None,
-        approvals: ApprovalQueue | None = None,
+        approvals: ApprovalBackend | None = None,
         episodic: EpisodicMemory | None = None,
         context_sources: Sequence[ContextSource] = (),
         context_budget: int = 8000,

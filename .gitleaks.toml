@@ -21,4 +21,7 @@ regexes = [
     # A made-up AWS-style key: the test vector for the span redactor in tests/test_telemetry.py.
     # It has to look like a real key for the redaction pattern to be tested at all.
     '''AKIAABCDEFGHIJKLMNOP''',  # pragma: allowlist secret
+    # The control-plane test harness's fixed server key (tests/harness.py): a throwaway value for an
+    # app that only ever runs against a scratch database in tests.
+    '''test-secret-key-0123456789-0123456789''',
 ]
