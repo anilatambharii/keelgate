@@ -24,6 +24,7 @@ CONSUMERS = [
     ROOT / "examples" / "mcp_server.py",
     ROOT / "examples" / "custom_policy_pack" / "run.py",
     ROOT / "examples" / "tutorial_governed_agent.py",
+    ROOT / "examples" / "cloud_governed_agent.py",
     ROOT / "examples" / "research_loop.py",
     ROOT
     / "examples"

@@ -14,6 +14,10 @@ Errors always have the shape `{"error": {"code": "...", "message": "..."}}`. Cod
 A `POST` that may be retried carries an `Idempotency-Key`; the server executes it once and replays
 the stored response.
 
+## Identity
+
+`GET /v1/whoami` returns `{tenant_id, key_id, plan}` for the calling key, so a client does not need to be told its tenant.
+
 ## Audit
 
 | Call | Meaning |

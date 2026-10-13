@@ -129,6 +129,7 @@ nav:
       - "ADR-0003 Capability grants": adr/0003-capability-grants-paseto.md
       - "ADR-0004 Durable loop and resume": adr/0004-durable-loop-and-resume-semantics.md
       - "ADR-0005 Telemetry, replay and evals": adr/0005-telemetry-replay-and-evals.md
+      - "ADR-0006 Hosted control plane": adr/0006-control-plane-architecture.md
 
 watch:
   - docs

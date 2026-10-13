@@ -1287,6 +1287,7 @@ exception CloudAuthError(CloudError)(message: str, *, code: str = 'cloud_error',
 class CloudClient(base_url: str, api_key: str, *, timeout_s: float = 10.0, transport: httpx.BaseTransport | None = None) -> None
     close() -> None
     request(method: str, path: str, *, json: Any = None, params: Mapping[str, Any] | None = None, idempotency_key: str | None = None) -> Any
+    whoami() -> dict[str, Any]
 exception CloudError(Exception)(message: str, *, code: str = 'cloud_error', status: int | None = None)
 class CloudPolicyEngine(client: CloudClient, pack_name: str) -> None
     async decide(policy_input: PolicyInput) -> PolicyDecision

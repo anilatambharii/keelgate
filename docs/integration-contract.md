@@ -299,7 +299,7 @@ exported chain verifies with `keelgate.audit.verify_chain`.
 
 | Symbol | Kind | Notes |
 |---|---|---|
-| `CloudClient(base_url, api_key)` | class | The shared HTTP client; reads are retried, writes only with an idempotency key |
+| `CloudClient(base_url, api_key)` | class | The shared HTTP client; reads are retried, writes only with an idempotency key; `whoami()` returns the key tenant and plan |
 | `CloudAuditStore` | `AuditStore` | The server assigns sequence, time and hashes; `CloudAuditError` (an `AuditError`) when an event was not recorded |
 | `CloudApprovalQueue` | `ApprovalBackend` | Hosted inbox; `CloudApprovalError` when the service is unreachable |
 | `CloudPolicyEngine` | `PolicyEngine` | `from_registry(client, pack)` downloads the deployed pack, checks its hash and decides locally; `refresh()` picks up a new version; `PolicyPackError` for a bad bundle; every decision is a DENY until a pack is loaded |

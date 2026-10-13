@@ -125,6 +125,11 @@ class CloudClient:
             raise CloudQuotaError(message, code=code, status=status)
         raise CloudError(message, code=code, status=status)
 
+    def whoami(self) -> dict[str, Any]:
+        """The tenant id, key id and plan this API key belongs to."""
+        body: dict[str, Any] = self.request("GET", "/v1/whoami")
+        return body
+
     def close(self) -> None:
         """Close the underlying connection pool."""
         self._http.close()
