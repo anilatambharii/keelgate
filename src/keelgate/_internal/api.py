@@ -35,6 +35,7 @@ PUBLIC_PACKAGES: Final = (
     "keelgate.adapters.claude_agent_sdk",
     "keelgate.adapters.a2a",
     "keelgate.adapters.temporal",
+    "keelgate.cloud",
 )
 
 # Plain modules that are public on purpose. Each one is either an entry-point or plugin target
@@ -61,6 +62,7 @@ PROVISIONAL_MODULES: Final = frozenset(
         "keelgate.adapters.claude_agent_sdk",
         "keelgate.adapters.a2a",
         "keelgate.adapters.temporal",
+        "keelgate.cloud",
         "keelgate.approvals.rest",
         "keelgate.policy.cedar",
         "keelgate.loop.langgraph_store",
@@ -76,6 +78,7 @@ PROVISIONAL_SYMBOLS: Final[dict[str, frozenset[str]]] = {
     "keelgate.capabilities": frozenset({"SqliteBudgetLedger", "SqliteRevocationList"}),
     "keelgate.tools": frozenset({"SqliteIdempotencyStore"}),
     "keelgate.audit": frozenset({"PostgresAuditStore"}),
+    "keelgate.approvals": frozenset({"ApprovalBackend", "ApprovalStore", "SqliteApprovalStore"}),
     "keelgate.loop": frozenset(
         {
             "READ_ONLY",

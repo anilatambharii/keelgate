@@ -173,6 +173,12 @@ request cannot back this execution). `ApprovalStatus` is `PENDING`, `APPROVED`, 
 `EXPIRED` or `CONSUMED`. `sanitize_for_display(text)` strips control characters from model-derived
 text before a human sees it.
 
+Storage and remote queues (provisional): `ApprovalStore` is the protocol a request store
+implements (`insert`, `get`, `swap`, `list_pending`, `close`) and `SqliteApprovalStore` is the
+default; pass one to `ApprovalQueue(store=...)` to keep requests elsewhere. `ApprovalBackend` is the
+three calls the tool gateway needs (`submit`, `get`, `consume`), so a remote queue can stand in for
+`ApprovalQueue`.
+
 ### `keelgate.loop`
 
 | Symbol | Kind | Notes |
@@ -283,6 +289,22 @@ through the same path: **registry, grant, policy, approvals, audit**
 | `keelgate.adapters.mcp` | `mcp` | `GovernedMCPServer` (stdio and streamable HTTP) exposes governed tools. `GovernedMCPClient` governs *consumed* tools: allowlist (`ExternalToolMapping`), capability mapping, optional schema-digest pinning (`schema_digest`), local argument validation (`ExternalArgs`), untrusted output (`ExternalOutput`); `Discovery` reports what was registered, blocked or missing, and `ExternalToolError` a failed call |
 | `keelgate.adapters.a2a` | `a2a` | `build_agent_card`, `build_a2a_app`, `GovernedA2AExecutor`, `loop_task_runner`, `TaskRequest` / `TaskResult`, `make_intake_tool` / `INTAKE_TOOL` / `IntakeIn` / `IntakeOut`. Task intake is a governed PROPOSE tool (`a2a_task_intake`, capability `a2a:task_submit`); remote text is untrusted and never becomes the goal |
 | `keelgate.adapters.temporal` | `temporal` | `KeelgateLoopWorkflow`, `TemporalRunner`, `build_worker`, `LoopActivities`, `WorkflowOptions`, `ACTIVITY_NAME`, `DEFAULT_TASK_QUEUE`: the loop as a Temporal activity |
+
+### `keelgate.cloud`
+
+Use a hosted control plane from an agent (provisional; plain HTTP against the protocol in
+[cloud-protocol](cloud-protocol.md), no extra dependencies). Nothing here weakens a safety control:
+the policy gate still runs in your process, a failed audit write still refuses the action, and the
+exported chain verifies with `keelgate.audit.verify_chain`.
+
+| Symbol | Kind | Notes |
+|---|---|---|
+| `CloudClient(base_url, api_key)` | class | The shared HTTP client; reads are retried, writes only with an idempotency key |
+| `CloudAuditStore` | `AuditStore` | The server assigns sequence, time and hashes; `CloudAuditError` (an `AuditError`) when an event was not recorded |
+| `CloudApprovalQueue` | `ApprovalBackend` | Hosted inbox; `CloudApprovalError` when the service is unreachable |
+| `CloudPolicyEngine` | `PolicyEngine` | `from_registry(client, pack)` downloads the deployed pack, checks its hash and decides locally; `refresh()` picks up a new version; `PolicyPackError` for a bad bundle; every decision is a DENY until a pack is loaded |
+| `CloudSpanExporter` | span exporter | Pass to `instrument(exporter=...)` |
+| `CloudError`, `CloudAuthError`, `CloudQuotaError` | exceptions | `.code` is the server code; `.status` the HTTP status |
 
 ### `keelgate.telemetry`
 

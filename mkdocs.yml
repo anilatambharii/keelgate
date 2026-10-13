@@ -117,6 +117,7 @@ nav:
           - Public modules: reference/modules.md
       - API contract: api-contract.md
       - Integration contract: integration-contract.md
+      - Control-plane protocol: cloud-protocol.md
   - Project:
       - Versioning and deprecation: versioning.md
       - Migrating to 0.2: migrating-to-0.2.md
