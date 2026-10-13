@@ -102,6 +102,55 @@ Stripe's own preview is attached for comparison. Webhooks are signature-verified
 - Plan values the commercial brief did not give (agent cap, rate limits, Team audit window, trial
   lengths, Business trace retention) are marked `assumed` in `plans.yaml` for the owner to confirm.
 
+## Security review
+
+An independent adversarial review (a second agent reading the code and running exploit scripts
+against a scratch database) could **not** break tenant isolation, the audit chain's integrity, or
+the approval rules, and **did** break several authorization and availability properties. Fixed, each
+with a test that fails without the fix:
+
+- An org admin could take over the owner account through SSO. SSO configuration is now owner-only,
+  the default role can no longer be admin, and a user created with a password is never claimed by
+  an IdP login.
+- An admin could create a user with EXPLICIT_SIGNOFF clearance and approve their own agent's
+  request. Only an owner can grant clearance above ONE_CLICK.
+- Sign-up and sign-in had no throttling and every endpoint had no body cap. Bodies are capped
+  (8 KB on unauthenticated routes, 4 MB elsewhere); sign-up and sign-in are rate-limited per
+  address, sign-in also per account.
+- An idempotency key could be replayed with a different event and be answered as if recorded.
+  Keys are now bound to the request that first used them (409 on mismatch), and a failed request
+  releases its claim.
+- SSO login CSRF: the state is bound to an HttpOnly cookie that the callback must present.
+- A Stripe checkout event could attach a subscription to any org that named itself in
+  `client_reference_id`. A session is now accepted only for the customer the org's own checkout
+  saved beforehand.
+- NAT64 and IPv4-compatible IPv6 addresses bypassed the SSRF check.
+- One org could occupy every policy-evaluation thread. Each org may run two at once.
+- Smaller: agent rate limits are per org (not per key) and keys are capped at 25; the server-only
+  event types are an explicit allowlist; deep or huge inputs are 422, not 500; viewers do not see
+  sign-off codes; the API docs can be switched off.
+
+**Known gaps, not fixed in K5** (the owner should decide before this faces the internet):
+
+- **No e-mail verification and no CAPTCHA at sign-up.** Anyone can create an org, and an
+  unverified address can be squatted. Sign-up and invite also reveal that an address already
+  exists. Needs a mail provider and a verification flow.
+- **SSO `allowed_domains` is not proven to be owned by the org** (no DNS TXT challenge).
+- **Policy evaluation is not sandboxed.** The per-org cap and timeouts bound request latency but
+  cannot stop a hostile tenant's runaway Rego from consuming CPU or memory in the shared process.
+  Hostile tenants need an out-of-process evaluator with resource limits (and the policy registry
+  must not be offered to untrusted sign-ups until it exists).
+- **No per-org storage quota** for audit records or traces, and audit rows cannot be deleted.
+- **Quota evasion by a customer is possible**: gated actions are counted from the `tool.call`
+  events the client sends, and agent ids are client-supplied. Enforcement is against a tenant's own
+  honest harness, not an adversarial one. Denied calls are counted (the attempt is the gated unit).
+- **DNS rebinding** in the SSO fetch is not closed (resolve-then-fetch); an egress firewall is the
+  backstop.
+- **Approval state and its audit event are two commits.** A database failure between them can leave
+  an approval without its record.
+- Rate limits, like everything in-process, multiply across instances (Redis needed).
+- `policy_versions`, `approvals` and `usage_*` are immutable by code, not by trigger.
+
 ## Rejected
 
 - **Server-side policy evaluation.** Simpler to operate, but makes a hosted dependency part of

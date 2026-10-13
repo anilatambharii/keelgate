@@ -100,6 +100,10 @@ def default_resolver(host: str) -> list[str]:
     return sorted({str(info[4][0]) for info in infos})
 
 
+_NAT64 = ipaddress.IPv6Network("64:ff9b::/96")
+_V4_COMPATIBLE = ipaddress.IPv6Network("::/96")
+
+
 def _is_public(address: str) -> bool:
     try:
         ip = ipaddress.ip_address(address.split("%", 1)[0])
@@ -109,6 +113,10 @@ def _is_public(address: str) -> bool:
         ip = ip.ipv4_mapped
     if isinstance(ip, ipaddress.IPv6Address) and ip.sixtofour is not None:
         ip = ip.sixtofour
+    # NAT64 (64:ff9b::/96) and the deprecated IPv4-compatible form (::/96) embed an IPv4
+    # address in the low 32 bits; judge that address, not the wrapper.
+    if isinstance(ip, ipaddress.IPv6Address) and (ip in _NAT64 or ip in _V4_COMPATIBLE):
+        ip = ipaddress.IPv4Address(int(ip) & 0xFFFFFFFF)
     return ip.is_global and not ip.is_multicast
 
 
@@ -572,7 +580,9 @@ def _sign_in(state: AppState, cfg: _Config, claims: dict[str, Any]) -> str:
     sub = str(claims["sub"])
     with state.db.tx(email=email) as conn:
         existing = conn.execute(
-            "SELECT id, org_id, disabled_at, oidc_subject FROM users WHERE email = %s", (email,)
+            "SELECT id, org_id, disabled_at, oidc_subject, password_hash "
+            "FROM users WHERE email = %s",
+            (email,),
         ).fetchone()
     provisioned = existing is None
     # One code for "belongs to another org", "disabled" and "different subject": no oracle.
@@ -581,6 +591,12 @@ def _sign_in(state: AppState, cfg: _Config, claims: dict[str, Any]) -> str:
             raise SsoFlowError("account_unavailable")
         user_id = str(existing["id"])
         if existing["oidc_subject"] is None:
+            # A user who was created with a password is never linked to an IdP identity by a
+            # login: whoever controls the IdP could otherwise take that account over (including
+            # the owner). Only people invited without a password are claimed by their first SSO
+            # login.
+            if existing["password_hash"] is not None:
+                raise SsoFlowError("account_unavailable")
             with state.db.tx(cfg.org_id) as conn:
                 claimed = conn.execute(
                     "UPDATE users SET oidc_subject = %s "

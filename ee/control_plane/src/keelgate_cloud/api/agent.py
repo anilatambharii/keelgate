@@ -25,7 +25,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from keelgate_cloud import metering
 from keelgate_cloud.api.deps import Agent, State, ensure_tenant
-from keelgate_cloud.api.idempotency import claim, complete
+from keelgate_cloud.api.idempotency import claim, complete, fingerprint, release
 from keelgate_cloud.api.routing import effective_tier
 from keelgate_cloud.errors import (
     ApiError,
@@ -33,6 +33,7 @@ from keelgate_cloud.errors import (
     NotFoundError,
     ValidationFailedError,
 )
+from keelgate_cloud.stores import IdempotencyMismatchError
 
 if TYPE_CHECKING:
     from keelgate.audit import AuditRecord
@@ -40,11 +41,20 @@ if TYPE_CHECKING:
 router = APIRouter(prefix="/v1", tags=["agent"])
 
 # Events a harness emits. Approval events are written by the server itself, never accepted here.
-CLIENT_EVENTS: Final = frozenset(e.value for e in EventType) - {
-    EventType.APPROVAL_REQUESTED.value,
-    EventType.APPROVAL_DECIDED.value,
-    EventType.APPROVAL_CONSUMED.value,
-}
+CLIENT_EVENTS: Final = frozenset(
+    {
+        EventType.TOOL_CALL.value,
+        EventType.GRANT_REJECTED.value,
+        EventType.POLICY_DECISION.value,
+        EventType.TOOL_RESULT.value,
+        EventType.TOOL_ERROR.value,
+        EventType.TOOL_REPLAY.value,
+        EventType.LOOP_TRANSITION.value,
+        EventType.MEMORY_WRITE.value,
+        EventType.CONTEXT_REJECTED.value,
+        EventType.OUTCOME_RECONCILED.value,
+    }
+)
 MAX_SPANS_PER_BATCH: Final = 1000
 MAX_ATTRIBUTE_BYTES: Final = 16_384
 MAX_TTL_SECONDS: Final = 7 * 24 * 3600
@@ -98,13 +108,15 @@ def append_event(
         )
     try:
         payload = json.loads(body.payload_json)
-    except ValueError as exc:
+    except (ValueError, RecursionError) as exc:  # RecursionError: absurdly deep nesting
         raise ValidationFailedError("payload_json is not valid JSON") from exc
     log = AuditLog(_KeyedStore(state.audit_store, idempotency_key))  # type: ignore[arg-type]
     try:
         record = log.append(
             tenant_id=org_id, event_type=body.event_type, actor=body.actor, payload=payload
         )
+    except IdempotencyMismatchError as exc:
+        raise ConflictError(str(exc), code="idempotency_key_reuse") from exc
     except AuditError as exc:
         raise ValidationFailedError(str(exc), code="audit_rejected") from exc
     return record.model_dump()
@@ -115,7 +127,7 @@ def list_records(
     principal: Agent,
     state: State,
     tenant_id: str | None = None,
-    after_seq: Annotated[int, Query(ge=0)] = 0,
+    after_seq: Annotated[int, Query(ge=0, le=2**62)] = 0,
     limit: Annotated[int, Query(ge=1, le=MAX_PAGE)] = 500,
 ) -> dict[str, Any]:
     """A page of the tenant's chain, oldest first."""
@@ -188,8 +200,9 @@ def submit_approval(
     org_id = ensure_tenant(principal, body.tenant_id)
     if body.tier is ApprovalTier.AUTO:
         raise ValidationFailedError("AUTO needs no approval request")
+    fp = fingerprint(body.model_dump(mode="json"))
     if idempotency_key is not None:
-        stored = claim(state, org_id, "approval", idempotency_key)
+        stored = claim(state, org_id, "approval", idempotency_key, fp)
         if stored is not None:
             return stored
     try:
@@ -205,13 +218,23 @@ def submit_approval(
             ttl=None if body.ttl_seconds is None else timedelta(seconds=body.ttl_seconds),
         )
     except ValueError as exc:
+        _release(state, org_id, idempotency_key)
         raise ValidationFailedError(f"invalid approval request: {exc}") from exc
     except ApprovalError as exc:
+        _release(state, org_id, idempotency_key)
         raise _approval_error(exc) from exc
+    except Exception:
+        _release(state, org_id, idempotency_key)
+        raise
     result: dict[str, Any] = request.model_dump(mode="json")
     if idempotency_key is not None:
-        complete(state, org_id, "approval", idempotency_key, result)
+        complete(state, org_id, "approval", idempotency_key, fp, result)
     return result
+
+
+def _release(state: Any, org_id: str, key: str | None) -> None:
+    if key is not None:
+        release(state, org_id, "approval", key)
 
 
 @router.get("/approvals")

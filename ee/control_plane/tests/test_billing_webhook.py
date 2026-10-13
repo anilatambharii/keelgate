@@ -167,12 +167,25 @@ def test_checkout_completed_links_customer_and_subscription(
     client: TestClient, db: Database
 ) -> None:
     org = Org(client)
-    ids = {**new_ids(), "ORG": org.id}  # a fresh customer: nothing linked yet
+    ids = {**new_ids(), "ORG": org.id}
+    link(db, org, customer=ids["CUSTOMER"])  # our checkout saves the customer before redirecting
     response = deliver(client, fixture("checkout_session_completed", **ids))
     assert response.json()["status"] == "processed"
     row = org_row(db, org)
     assert row["stripe_customer_id"] == ids["CUSTOMER"]
     assert row["stripe_subscription_id"] == ids["SUB"]
+
+
+def test_a_checkout_for_an_org_without_a_customer_is_ignored(
+    client: TestClient, db: Database
+) -> None:
+    """A Payment Link (or anyone) naming an org in client_reference_id cannot attach a customer."""
+    org = Org(client)
+    ids = {**new_ids(), "ORG": org.id}
+    deliver(client, fixture("checkout_session_completed", **ids))
+    row = org_row(db, org)
+    assert row["stripe_customer_id"] is None
+    assert row["stripe_subscription_id"] is None
 
 
 def test_checkout_for_a_different_customer_than_the_orgs_is_ignored(

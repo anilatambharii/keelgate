@@ -4,7 +4,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { api, ApiError } from "@/lib/api";
 import { useLoad } from "@/lib/hooks";
 import type { OrgSettings, SsoConfig } from "@/lib/types";
-import { isAdmin, useMe } from "./me-context";
+import { useMe } from "./me-context";
 import { errorMessage, useToast } from "./toast";
 import {
   Alert,
@@ -77,7 +77,7 @@ export function SettingsPage() {
           )}
         </Card>
 
-        {isAdmin(me.user.role) ? (
+        {me.user.role === "owner" ? (
           hasSso ? (
             <SsoCard />
           ) : (
@@ -178,7 +178,7 @@ export function SsoCard() {
   const [clientId, setClientId] = useState("");
   const [secret, setSecret] = useState("");
   const [domains, setDomains] = useState("");
-  const [role, setRole] = useState<"admin" | "approver" | "viewer">("viewer");
+  const [role, setRole] = useState<"approver" | "viewer">("viewer");
   const [enabled, setEnabled] = useState(true);
   const [busy, setBusy] = useState(false);
   const [removing, setRemoving] = useState(false);
@@ -304,11 +304,10 @@ export function SsoCard() {
           <SelectField
             label="Default role for new SSO users"
             value={role}
-            onChange={(e) => setRole(e.target.value as "admin" | "approver" | "viewer")}
+            onChange={(e) => setRole(e.target.value as "approver" | "viewer")}
           >
             <option value="viewer">viewer</option>
             <option value="approver">approver</option>
-            <option value="admin">admin</option>
           </SelectField>
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />

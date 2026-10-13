@@ -327,7 +327,12 @@ def test_version_numbering_is_race_safe(server: dict[str, Any], http: TestClient
     def worker(i: int) -> None:
         client = TestClient(server["app"])
         gate.wait()
-        response = new_version(client, org, "race", pack({"mini.rego": MINI + f"\n# {i}\n"}))
+        # The per-org evaluation cap answers 429 when too many run at once: back off and retry.
+        for _ in range(200):
+            response = new_version(client, org, "race", pack({"mini.rego": MINI + f"\n# {i}\n"}))
+            if response.status_code != 429:
+                break
+            time.sleep(0.05)
         statuses.append((response.status_code, response.json().get("version")))
 
     threads = [threading.Thread(target=worker, args=(i,)) for i in range(8)]

@@ -28,6 +28,10 @@ class Settings:
     # Live Stripe keys are refused unless this is set by the owner, in the environment, on purpose.
     allow_live_stripe: bool = False
     session_ttl_hours: int = 12
+    # Pre-authentication limits, per client address (login also per e-mail at a third of this).
+    signup_per_minute: int = 5
+    login_per_minute: int = 30
+    docs_enabled: bool = True
     cors_origins: tuple[str, ...] = ("http://localhost:3000",)
     # Lets an OIDC issuer be plain http and/or on a private network (a local IdP). Never in prod.
     oidc_allow_http: bool = False
@@ -61,6 +65,9 @@ class Settings:
             stripe_api_base=env.get("KEELGATE_CP_STRIPE_API_BASE") or None,
             allow_live_stripe=env.get("KEELGATE_CP_ALLOW_LIVE_STRIPE") == "1",
             session_ttl_hours=int(env.get("KEELGATE_CP_SESSION_TTL_HOURS", "12")),
+            signup_per_minute=int(env.get("KEELGATE_CP_SIGNUP_PER_MINUTE", "5")),
+            login_per_minute=int(env.get("KEELGATE_CP_LOGIN_PER_MINUTE", "30")),
+            docs_enabled=env.get("KEELGATE_CP_DOCS", "1") == "1",
             oidc_allow_http=env.get("KEELGATE_CP_OIDC_ALLOW_HTTP") == "1",
             cors_origins=tuple(
                 o

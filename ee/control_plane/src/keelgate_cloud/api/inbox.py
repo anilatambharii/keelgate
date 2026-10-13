@@ -35,12 +35,12 @@ class RouteIn(_Body):
     enabled: bool = True
 
 
-def _view(request: Any) -> dict[str, Any]:
+def _view(request: Any, *, show_code: bool = True) -> dict[str, Any]:
     data: dict[str, Any] = request.model_dump(mode="json")
     explicit = request.tier is ApprovalTier.EXPLICIT_SIGNOFF
     data["signoff_code_required"] = explicit
     # Shown to the signed-in approver, as the CLI does: typing it back proves they read it.
-    data["signoff_code"] = request.signoff_code if explicit else None
+    data["signoff_code"] = request.signoff_code if explicit and show_code else None
     return data
 
 
@@ -58,14 +58,18 @@ def list_inbox(
         # Expiry is applied lazily on read: refresh so the inbox never offers an expired request.
         items = [state.approvals.get(principal.org_id, r.request_id) for r in items]
         items = [r for r in items if r.status.value == "PENDING"]
-    return {"items": [_view(r) for r in items]}
+    show = principal.role != "viewer"
+    return {"items": [_view(r, show_code=show) for r in items]}
 
 
 @router.get("/approvals/{request_id}")
 def get_request(request_id: str, principal: User, state: State) -> dict[str, Any]:
     """One request with its evidence."""
     try:
-        return _view(state.approvals.get(principal.org_id, request_id))
+        return _view(
+            state.approvals.get(principal.org_id, request_id),
+            show_code=principal.role != "viewer",
+        )
     except ApprovalError as exc:
         raise _approval_error(exc) from exc
 

@@ -27,6 +27,10 @@ def _lock_key(org_id: str) -> int:
     return int.from_bytes(hashlib.sha256(org_id.encode()).digest()[:8], "big") >> 1
 
 
+class IdempotencyMismatchError(AuditError):
+    """An idempotency key was reused for a different event than the one it first recorded."""
+
+
 class RlsAuditStore:
     """The audit chain of every org, in one table protected by row-level security.
 
@@ -56,7 +60,17 @@ class RlsAuditStore:
                     (idempotency_key,),
                 ).fetchone()
                 if stored is not None:
-                    return AuditRecord.model_validate(stored["response"])
+                    first = AuditRecord.model_validate(stored["response"])
+                    draft = build(first.seq, first.prev_hash, None)
+                    if (draft.event_type, draft.actor, draft.payload_json) != (
+                        first.event_type,
+                        first.actor,
+                        first.payload_json,
+                    ):
+                        raise IdempotencyMismatchError(
+                            "this idempotency key was already used for a different event"
+                        )
+                    return first
             last = conn.execute(
                 "SELECT seq, timestamp, hash FROM audit_records ORDER BY seq DESC LIMIT 1"
             ).fetchone()

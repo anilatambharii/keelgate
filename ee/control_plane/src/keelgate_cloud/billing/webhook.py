@@ -204,12 +204,14 @@ def _apply_checkout(
 ) -> dict[str, Any]:
     customer = _id_of(obj.get("customer"))
     subscription = _id_of(obj.get("subscription"))
-    if org["stripe_customer_id"] and customer and org["stripe_customer_id"] != customer:
-        log.warning("checkout for org %s names a different customer; ignored", org["id"])
+    # Our own checkout creates the customer and saves it on the org *before* sending the buyer to
+    # Stripe. A completed session is therefore accepted only for that exact customer. Anything else
+    # (a Payment Link, or a session that merely names this org in client_reference_id) cannot
+    # attach someone else's subscription to the org.
+    if not org["stripe_customer_id"] or not customer or org["stripe_customer_id"] != customer:
+        log.warning("checkout for org %s is not for its Stripe customer; ignored", org["id"])
         return {}
     changes: dict[str, Any] = {}
-    if customer and not org["stripe_customer_id"]:
-        changes["stripe_customer_id"] = customer
     if subscription:
         changes["stripe_subscription_id"] = subscription
     return _update_org(conn, changes)

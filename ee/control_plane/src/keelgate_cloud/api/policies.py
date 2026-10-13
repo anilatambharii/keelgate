@@ -6,17 +6,24 @@ against the stored sources; the stored report is evidence, never trusted on its 
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from typing import Any
 
 import psycopg.errors
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 from keelgate.audit import AuditError
 from psycopg.types.json import Jsonb
 
 from keelgate_cloud import policy_registry as reg
 from keelgate_cloud.api.deps import Agent, State, User, require_roles
-from keelgate_cloud.errors import ApiError, ConflictError, NotFoundError, ValidationFailedError
+from keelgate_cloud.errors import (
+    ApiError,
+    ConflictError,
+    NotFoundError,
+    RateLimitedError,
+    ValidationFailedError,
+)
 
 router = APIRouter(tags=["policies"])
 
@@ -29,6 +36,21 @@ class IntegrityError(ApiError):
 
 
 WRITERS = require_roles("owner", "admin")
+
+
+def _evaluation_slot(principal: User) -> Iterator[None]:
+    """Limit how many policy evaluations one org can have running at once."""
+    try:
+        reg.acquire_org_slot(principal.org_id)
+    except reg.EvaluatorBusyError as exc:
+        raise RateLimitedError(str(exc), code="policy_busy") from exc
+    try:
+        yield
+    finally:
+        reg.release_org_slot(principal.org_id)
+
+
+EVAL_SLOT = Depends(_evaluation_slot)
 
 
 # -------------------------------------------------------------------------------------- helpers
@@ -147,7 +169,7 @@ def list_policies(principal: User, state: State) -> dict[str, Any]:
 # ------------------------------------------------------------------------------------- simulate
 
 
-@router.post("/api/policies/simulate", dependencies=[WRITERS])
+@router.post("/api/policies/simulate", dependencies=[WRITERS, EVAL_SLOT])
 def simulate(body: reg.SimulateBody) -> dict[str, Any]:
     """Evaluate ad-hoc input(s) against unsaved sources. Persists nothing."""
     if (body.input is None) == (body.cases is None):
@@ -175,7 +197,7 @@ def simulate(body: reg.SimulateBody) -> dict[str, Any]:
 # --------------------------------------------------------------------------------- create / read
 
 
-@router.post("/api/policies", status_code=201, dependencies=[WRITERS])
+@router.post("/api/policies", status_code=201, dependencies=[WRITERS, EVAL_SLOT])
 def create_pack(body: reg.CreateBody, principal: User, state: State) -> dict[str, Any]:
     """Create a pack and its first version. The version is tested but not deployed."""
     reg.validate_name(body.name)
@@ -222,7 +244,7 @@ def list_versions(name: str, principal: User, state: State) -> dict[str, Any]:
     return {"items": items}
 
 
-@router.post("/api/policies/{name}/versions", status_code=201, dependencies=[WRITERS])
+@router.post("/api/policies/{name}/versions", status_code=201, dependencies=[WRITERS, EVAL_SLOT])
 def create_version(name: str, body: reg.PackBody, principal: User, state: State) -> dict[str, Any]:
     """Add version n+1. Numbering is serialised by a lock on the pack row."""
     report = _evaluate(body)
@@ -315,7 +337,9 @@ def _deployed(name: str, version: int, digest: str, at: Any, principal: Any) -> 
 
 
 @router.post(
-    "/api/policies/{name}/versions/{number}/deploy", response_model=None, dependencies=[WRITERS]
+    "/api/policies/{name}/versions/{number}/deploy",
+    response_model=None,
+    dependencies=[WRITERS, EVAL_SLOT],
 )
 def deploy(name: str, number: int, principal: User, state: State) -> Any:
     """Make a version active, but only if its cases exist and pass right now."""

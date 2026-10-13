@@ -201,6 +201,8 @@ def test_the_whole_story(stack: str, db: Database) -> None:
     # 6. Billing: the trial converts through Stripe (test mode). The org links to a Stripe
     #    customer and subscription via the signed webhook, then previews its next invoice.
     ids = {**new_ids(), "ORG": org_id}
+    with db.tx(org_id) as conn:  # our checkout endpoint saves the customer before redirecting
+        conn.execute("UPDATE orgs SET stripe_customer_id = %s", (ids["CUSTOMER"],))
     checkout = fixture("checkout_session_completed", **ids)
     delivered = deliver_signed(human, checkout)
     assert delivered.status_code == 200, delivered.text

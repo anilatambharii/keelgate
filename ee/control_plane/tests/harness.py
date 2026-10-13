@@ -29,7 +29,13 @@ PASSWORD = "correct horse battery staple"  # pragma: allowlist secret
 
 
 def make_settings(**over: Any) -> Settings:
-    base: dict[str, Any] = {"database_url": "unused", "secret_key": SECRET}
+    # Tests sign up many orgs from one address; the real limits have their own tests.
+    base: dict[str, Any] = {
+        "database_url": "unused",
+        "secret_key": SECRET,
+        "signup_per_minute": 100_000,
+        "login_per_minute": 100_000,
+    }
     base.update(over)
     return Settings(**base)
 

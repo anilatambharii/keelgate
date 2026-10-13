@@ -239,6 +239,32 @@ def _guarded(fn: Callable[[], _T], timeout: float) -> _T:
     return box["value"]  # type: ignore[no-any-return]
 
 
+MAX_EVALUATIONS_PER_ORG: Final = 2
+_org_slots: dict[str, int] = {}
+_org_slots_lock = threading.Lock()
+
+
+def acquire_org_slot(org_id: str) -> None:
+    """Take one of an org's concurrent evaluation slots, or raise ``EvaluatorBusyError``.
+
+    Evaluation runs on shared threads, so one tenant must not be able to occupy all of them.
+    """
+    with _org_slots_lock:
+        if _org_slots.get(org_id, 0) >= MAX_EVALUATIONS_PER_ORG:
+            raise EvaluatorBusyError("too many policy evaluations in flight for this organisation")
+        _org_slots[org_id] = _org_slots.get(org_id, 0) + 1
+
+
+def release_org_slot(org_id: str) -> None:
+    """Give a slot back."""
+    with _org_slots_lock:
+        left = _org_slots.get(org_id, 0) - 1
+        if left > 0:
+            _org_slots[org_id] = left
+        else:
+            _org_slots.pop(org_id, None)
+
+
 def source_hash(files: dict[str, str]) -> str:
     """The version hash the client recomputes and checks."""
     return hash_sources(files)

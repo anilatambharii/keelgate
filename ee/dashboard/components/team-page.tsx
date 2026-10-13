@@ -126,7 +126,12 @@ export function TeamPage() {
             />
             <SelectField
               label="Approval clearance"
-              hint="EXPLICIT_SIGNOFF lets them decide the highest-risk requests."
+              hint={
+                owner
+                  ? "EXPLICIT_SIGNOFF lets them decide the highest-risk requests."
+                  : "Only the owner can grant EXPLICIT_SIGNOFF clearance."
+              }
+              disabled={!owner}
               value={tier}
               onChange={(e) => setTier(e.target.value as ApprovalTier)}
             >

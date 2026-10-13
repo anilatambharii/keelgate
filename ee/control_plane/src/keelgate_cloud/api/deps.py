@@ -47,7 +47,8 @@ def agent_principal(request: Request, state: State) -> Principal:
     plan = state.plan_of(principal.org_id)
     if not plan.hosted:
         raise PlanRequiredError("this plan is self-hosted and is not served by the control plane")
-    state.limiter.check(principal.actor, plan.rate_limit_per_minute)
+    # Per org, not per key: minting more keys must not multiply the allowance.
+    state.limiter.check(f"org:{principal.org_id}", plan.rate_limit_per_minute)
     return principal
 
 

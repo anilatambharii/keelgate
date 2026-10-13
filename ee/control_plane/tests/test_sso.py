@@ -21,7 +21,7 @@ from cryptography.hazmat.primitives.asymmetric import ec, rsa
 from fastapi.testclient import TestClient
 
 from keelgate_cloud.db import Database
-from tests.harness import PASSWORD, Org, make_app, unique_email
+from tests.harness import Org, make_app, unique_email
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
@@ -151,7 +151,7 @@ class Env:
         self.app = app
         self.idp = idp
         self.db = db
-        self.client = TestClient(app, follow_redirects=False)
+        self.client = TestClient(app, base_url="https://testserver", follow_redirects=False)
 
     def org(self, name: str = "Acme") -> Org:
         return Org(self.client, name)
@@ -234,6 +234,11 @@ def org(env: Env) -> Org:
 
 def test_full_login_flow_provisions_a_user_and_opens_a_session(env: Env, org: Org) -> None:
     assert env.configure(org, default_role="approver").status_code == 200
+    first = env.client.get("/api/sso/login", params={"org": env.slug(org)})
+    assert first.headers["location"].startswith(f"{ISSUER}/authorize?")
+    assert first.headers["cache-control"] == "no-store"
+    cookie = first.headers["set-cookie"]
+    assert "kg_sso_state=" in cookie and "HttpOnly" in cookie and "SameSite=lax" in cookie
     state, params = env.start(org)
     assert params["response_type"] == "code"
     assert params["scope"] == "openid email profile"
@@ -241,9 +246,6 @@ def test_full_login_flow_provisions_a_user_and_opens_a_session(env: Env, org: Or
     assert params["redirect_uri"] == f"{PUBLIC_URL}/api/sso/callback"
     assert params["code_challenge_method"] == "S256"
     assert params["nonce"] and len(state) >= 32
-    first = env.client.get("/api/sso/login", params={"org": env.slug(org)})
-    assert first.headers["location"].startswith(f"{ISSUER}/authorize?")
-    assert first.headers["cache-control"] == "no-store"
 
     email = unique_email("newbie")
     code = env.idp.issue_code(
@@ -480,17 +482,31 @@ def test_existing_user_signs_in_and_subject_is_pinned(env: Env, org: Org) -> Non
     email = unique_email("member")
     invited = env.client.post(
         "/api/users",
-        json={"email": email, "role": "admin", "password": PASSWORD},
+        json={"email": email, "role": "approver"},  # no password: SSO-only
         headers=org.auth,
     )
     assert invited.status_code == 201
     headers = session_headers(env.login(org, email=email, sub="s-1"))
-    assert env.client.get("/api/me", headers=headers).json()["user"]["role"] == "admin"
+    assert env.client.get("/api/me", headers=headers).json()["user"]["role"] == "approver"
     assert session_headers(env.login(org, email=email, sub="s-1"))
     assert error_code(env.login(org, email=email, sub="s-2")) == "account_unavailable"
     with env.db.tx(org.id) as conn:
         row = conn.execute("SELECT oidc_subject FROM users WHERE email = %s", (email,)).fetchone()
     assert row is not None and row["oidc_subject"] == "s-1"
+
+
+def test_an_account_created_with_a_password_is_never_claimed_by_an_idp_login(
+    env: Env, org: Org
+) -> None:
+    """Whoever controls an IdP must not be able to become an existing password account."""
+    assert error_code(env.login(org, email=org.email, sub="attacker")) == "account_unavailable"
+    me = env.client.get("/api/me", headers=org.auth).json()["user"]
+    assert me["email"] == org.email and me["role"] == "owner"
+    with env.db.tx(org.id) as conn:
+        row = conn.execute(
+            "SELECT oidc_subject FROM users WHERE email = %s", (org.email,)
+        ).fetchone()
+    assert row is not None and row["oidc_subject"] is None
 
 
 def test_an_email_in_another_org_is_refused_generically(env: Env, org: Org) -> None:
@@ -555,7 +571,7 @@ def test_omitting_the_secret_keeps_the_stored_one(env: Env, org: Org) -> None:
         "issuer": ISSUER,
         "client_id": CLIENT_ID,
         "allowed_domains": ["example.com"],
-        "default_role": "admin",
+        "default_role": "approver",
     }
     assert env.client.put("/api/sso", json=body, headers=org.auth).status_code == 200
     assert session_headers(env.login(org))  # still authenticates at the IdP
@@ -578,16 +594,41 @@ def test_config_changes_are_audited_without_the_secret(env: Env, org: Org) -> No
     assert rows and CLIENT_SECRET not in rows[-1]["payload_json"]
 
 
-@pytest.mark.parametrize("role", ["approver", "viewer"])
-def test_only_owners_and_admins_configure_sso(env: Env, org: Org, role: str) -> None:
+@pytest.mark.parametrize("role", ["admin", "approver", "viewer"])
+def test_only_the_owner_configures_sso(env: Env, org: Org, role: str) -> None:
     headers = org.invite(role)
     assert env.client.get("/api/sso", headers=headers).status_code == 403
     body = {"issuer": ISSUER, "client_id": "x", "client_secret": "y", "allowed_domains": ["a.com"]}
     assert env.client.put("/api/sso", json=body, headers=headers).status_code == 403
     assert env.client.delete("/api/sso", headers=headers).status_code == 403
     assert env.client.get("/api/sso").status_code == 401
-    admin = org.invite("admin")
-    assert env.client.get("/api/sso", headers=admin).status_code == 200
+    assert env.client.get("/api/sso", headers=org.auth).status_code in (200, 404)
+
+
+def test_the_default_role_can_never_be_admin(env: Env, org: Org) -> None:
+    body = {
+        "issuer": ISSUER,
+        "client_id": CLIENT_ID,
+        "client_secret": CLIENT_SECRET,
+        "allowed_domains": ["example.com"],
+        "default_role": "admin",
+    }
+    assert env.client.put("/api/sso", json=body, headers=org.auth).status_code == 422
+
+
+def test_a_callback_without_the_browsers_own_state_cookie_is_refused(env: Env, org: Org) -> None:
+    """Login CSRF: finishing someone else's login URL in a different browser must not sign in."""
+    state, params = env.start(org)
+    code = env.idp.issue_code(
+        params["nonce"],
+        params["code_challenge"],
+        lambda n: env.idp.sign(env.idp.claims(n, email=unique_email("v"), sub="v-1")),
+    )
+    other_browser = TestClient(env.app, base_url="https://testserver", follow_redirects=False)
+    response = other_browser.get("/api/sso/callback", params={"code": code, "state": state})
+    assert error_code(response) == "invalid_state"
+    # The state was consumed, so the legitimate browser cannot be tricked into replaying it either.
+    assert error_code(env.client.get("/api/sso/callback", params={"code": code, "state": state}))
 
 
 def test_a_plan_without_sso_cannot_configure_it(db: Database) -> None:

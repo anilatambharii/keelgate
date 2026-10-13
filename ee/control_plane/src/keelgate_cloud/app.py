@@ -24,6 +24,7 @@ from keelgate_cloud.api import (
 from keelgate_cloud.config import Settings
 from keelgate_cloud.db import Database
 from keelgate_cloud.errors import ApiError
+from keelgate_cloud.limits import BodyLimitMiddleware
 from keelgate_cloud.state import AppState, build_state
 
 if TYPE_CHECKING:
@@ -58,9 +59,16 @@ def create_app(
     """Build the app. Tests pass their own database and settings."""
     config = config or Settings.from_env()
     database = db or Database(config.database_url)
-    app = FastAPI(title="Keelgate Cloud control plane", version="0.1.0", docs_url="/api/docs")
+    app = FastAPI(
+        title="Keelgate Cloud control plane",
+        version="0.1.0",
+        docs_url="/api/docs" if config.docs_enabled else None,
+        redoc_url=None,
+        openapi_url="/openapi.json" if config.docs_enabled else None,
+    )
     state: AppState = build_state(config, database, catalogue)
     app.state.kg = state
+    app.add_middleware(BodyLimitMiddleware)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=list(config.cors_origins),

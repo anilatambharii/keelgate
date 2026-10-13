@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import urllib.parse
@@ -12,16 +13,18 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-from keelgate_cloud import sso
+from keelgate_cloud import security, sso
 from keelgate_cloud.api.deps import State, User, require_feature, require_roles
 from keelgate_cloud.errors import NotFoundError, ValidationFailedError
+from keelgate_cloud.limits import throttle
 
 router = APIRouter(prefix="/api/sso", tags=["sso"])
 log = logging.getLogger("keelgate_cloud.sso")
 
 _MAX_BODY = 32_768
 _NO_STORE = {"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"}
-_ADMIN = require_roles("owner", "admin")
+STATE_COOKIE = "kg_sso_state"
+_ADMIN = require_roles("owner")  # who controls the IdP controls who can sign in: owner only
 
 
 class SsoConfigIn(BaseModel):
@@ -33,7 +36,7 @@ class SsoConfigIn(BaseModel):
     client_id: str = Field(min_length=1, max_length=255)
     client_secret: str | None = Field(default=None, min_length=1, max_length=2048, repr=False)
     allowed_domains: list[str] = Field(max_length=50)
-    default_role: Literal["admin", "approver", "viewer"] = "viewer"
+    default_role: Literal["approver", "viewer"] = "viewer"
     enabled: bool = True
 
 
@@ -149,13 +152,32 @@ def delete_config(state: State, principal: User) -> Response:
 
 
 @router.get("/login", include_in_schema=False)
-def login(state: State, org: Annotated[str, Query(max_length=63)]) -> RedirectResponse:
-    """Send the browser to the IdP. Every reason SSO is unavailable looks the same."""
+def login(
+    request: Request, state: State, org: Annotated[str, Query(max_length=63)]
+) -> RedirectResponse:
+    """Send the browser to the IdP. Every reason SSO is unavailable looks the same.
+
+    The state is also set as an HttpOnly cookie, and the callback requires both to match. Without
+    that, an attacker could finish a login themselves and send the callback URL to a victim, who
+    would then be signed in to the attacker's account (login CSRF).
+    """
+    throttle(state, request, "sso-login", 60)
     try:
         url = sso.start_login(state, org)
     except sso.SsoUnavailableError:
         raise NotFoundError("single sign-on is not available", code="sso_not_available") from None
-    return RedirectResponse(url, status_code=302, headers=_NO_STORE)
+    response = RedirectResponse(url, status_code=302, headers=_NO_STORE)
+    issued = urllib.parse.parse_qs(urllib.parse.urlparse(url).query).get("state", [""])[0]
+    response.set_cookie(
+        STATE_COOKIE,
+        issued,
+        max_age=sso.STATE_TTL_SECONDS,
+        httponly=True,
+        samesite="lax",
+        secure=state.settings.public_url.startswith("https://"),
+        path="/api/sso",
+    )
+    return response
 
 
 def _error_redirect(state: State, code: str) -> RedirectResponse:
@@ -169,20 +191,33 @@ def _error_redirect(state: State, code: str) -> RedirectResponse:
 
 @router.get("/callback", include_in_schema=False)
 def callback(
+    request: Request,
     state: State,
     code: Annotated[str | None, Query(max_length=2048)] = None,
     state_param: Annotated[str | None, Query(alias="state", max_length=512)] = None,
     error: Annotated[str | None, Query(max_length=512)] = None,
 ) -> RedirectResponse:
     """Finish the login. The session token travels in the URL fragment, never the query."""
+    cookie = request.cookies.get(STATE_COOKIE, "")
+    bound = bool(state_param and cookie) and security.constant_time_equal(cookie, state_param or "")
     try:
+        if not bound:
+            # Still consume the state so a replayed or stolen URL cannot be retried.
+            with contextlib.suppress(sso.SsoFlowError):
+                sso.finish_login(state, code=None, state_value=state_param, idp_error="unbound")
+            return _clear(_error_redirect(state, "invalid_state"))
         token = sso.finish_login(state, code=code, state_value=state_param, idp_error=error)
     except sso.SsoFlowError as exc:
-        return _error_redirect(state, exc.code)
+        return _clear(_error_redirect(state, exc.code))
     except Exception:
         log.exception("sso: unexpected failure in callback")
-        return _error_redirect(state, "server_error")
+        return _clear(_error_redirect(state, "server_error"))
     base = state.settings.dashboard_url.rstrip("/")
-    return RedirectResponse(
-        f"{base}/sso/complete#token={token}", status_code=302, headers=_NO_STORE
+    return _clear(
+        RedirectResponse(f"{base}/sso/complete#token={token}", status_code=302, headers=_NO_STORE)
     )
+
+
+def _clear(response: RedirectResponse) -> RedirectResponse:
+    response.delete_cookie(STATE_COOKIE, path="/api/sso")
+    return response

@@ -16,6 +16,7 @@ from keelgate_cloud.errors import (
     AuthenticationError,
     ConflictError,
     NotFoundError,
+    PermissionDeniedError,
     SubscriptionInactiveError,
     ValidationFailedError,
 )
@@ -29,6 +30,7 @@ ROLES: Final = ("owner", "admin", "approver", "viewer")
 _LAST_USED_REFRESH: Final = timedelta(minutes=1)
 _ACTIVE_STATUSES: Final = frozenset({"trialing", "active", "past_due"})
 SIGNUP_PLAN: Final = "team"
+MAX_ACTIVE_KEYS: Final = 25
 
 
 @dataclass(frozen=True)
@@ -177,6 +179,15 @@ class Identity:
         name = name.strip()
         if not 1 <= len(name) <= 100:
             raise ValidationFailedError("key name must be 1 to 100 characters")
+        with self._db.tx(org_id) as conn:
+            active = conn.execute(
+                "SELECT count(*) AS n FROM api_keys WHERE revoked_at IS NULL"
+            ).fetchone()
+        if active is not None and active["n"] >= MAX_ACTIVE_KEYS:
+            raise ConflictError(
+                f"an org can have at most {MAX_ACTIVE_KEYS} active API keys; revoke one first",
+                code="key_cap_reached",
+            )
         key, prefix, key_hash = security.new_api_key()
         expires = datetime.now(UTC) + timedelta(days=expires_in_days) if expires_in_days else None
         with self._db.tx(org_id) as conn:
@@ -249,13 +260,20 @@ class Identity:
         role: str,
         password: str | None = None,
         approval_tier: str = "ONE_CLICK",
+        granted_by_owner: bool = False,
     ) -> Row:
-        """Add a user to the org. Without a password the user can only sign in with SSO."""
+        """Add a user to the org. Without a password the user can only sign in with SSO.
+
+        Clearance above ONE_CLICK can be granted only by an owner (``granted_by_owner``): an admin
+        who could create a cleared approver could approve their own agent's requests.
+        """
         email = _normalise_email(email)
         if role not in ROLES or role == "owner":
             raise ValidationFailedError("role must be admin, approver or viewer")
         if approval_tier not in ("ONE_CLICK", "EXPLICIT_SIGNOFF"):
             raise ValidationFailedError("unknown approval tier")
+        if approval_tier != "ONE_CLICK" and not granted_by_owner:
+            raise PermissionDeniedError("only an owner can grant EXPLICIT_SIGNOFF clearance")
         try:
             hashed = security.hash_password(password) if password else None
         except security.WeakPasswordError as exc:

@@ -320,7 +320,7 @@ export interface SsoConfig {
   client_id: string;
   client_secret_set: boolean;
   allowed_domains: string[];
-  default_role: "admin" | "approver" | "viewer";
+  default_role: "approver" | "viewer";
   enabled: boolean;
   updated_at?: string;
   redirect_uri?: string;

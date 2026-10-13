@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from keelgate_cloud.api.deps import State, User, bearer_token, require_roles
 from keelgate_cloud.errors import PermissionDeniedError
+from keelgate_cloud.limits import throttle
 
 router = APIRouter(prefix="/api", tags=["accounts"])
 
@@ -60,8 +61,9 @@ def _org_view(state: Any, org: dict[str, Any]) -> dict[str, Any]:
 
 
 @router.post("/signup", status_code=201)
-def signup(body: SignupIn, state: State) -> dict[str, Any]:
+def signup(body: SignupIn, request: Request, state: State) -> dict[str, Any]:
     """Create an organisation (on a trial) and its owner. Returns a session token."""
+    throttle(state, request, "signup", state.settings.signup_per_minute)
     org, token = state.identity.signup(
         org_name=body.org_name, email=body.email, password=body.password
     )
@@ -69,8 +71,9 @@ def signup(body: SignupIn, state: State) -> dict[str, Any]:
 
 
 @router.post("/login")
-def login(body: LoginIn, state: State) -> dict[str, str]:
+def login(body: LoginIn, request: Request, state: State) -> dict[str, str]:
     """Open a session with an e-mail and password."""
+    throttle(state, request, "login", state.settings.login_per_minute, body.email.strip().lower())
     return {"token": state.identity.login(email=body.email, password=body.password)}
 
 
@@ -144,6 +147,7 @@ def invite_user(body: UserIn, principal: User, state: State) -> dict[str, Any]:
         role=body.role,
         password=body.password,
         approval_tier=body.approval_tier,
+        granted_by_owner=principal.role == "owner",
     )
     return _jsonable(row)
 
