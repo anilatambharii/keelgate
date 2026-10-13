@@ -1,0 +1,29 @@
+{
+  "id": "__EVENT__",
+  "object": "event",
+  "api_version": "2025-09-30.clover",
+  "created": 1760000000,
+  "livemode": false,
+  "pending_webhooks": 1,
+  "request": {
+    "id": null,
+    "idempotency_key": null
+  },
+  "type": "checkout.session.completed",
+  "data": {
+    "object": {
+      "id": "cs_test_1",
+      "object": "checkout.session",
+      "mode": "subscription",
+      "status": "complete",
+      "payment_status": "no_payment_required",
+      "customer": "__CUSTOMER__",
+      "subscription": "__SUB__",
+      "client_reference_id": "__ORG__",
+      "metadata": {
+        "org_id": "__ORG__",
+        "keelgate_plan": "team"
+      }
+    }
+  }
+}

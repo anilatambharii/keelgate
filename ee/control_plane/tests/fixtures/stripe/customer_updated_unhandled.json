@@ -1,0 +1,20 @@
+{
+  "id": "__EVENT__",
+  "object": "event",
+  "api_version": "2025-09-30.clover",
+  "created": 1760000000,
+  "livemode": false,
+  "pending_webhooks": 1,
+  "request": {
+    "id": null,
+    "idempotency_key": null
+  },
+  "type": "customer.updated",
+  "data": {
+    "object": {
+      "id": "__CUSTOMER__",
+      "object": "customer",
+      "email": "x@example.com"
+    }
+  }
+}

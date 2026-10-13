@@ -55,6 +55,13 @@ class _Body(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+@router.get("/whoami")
+def whoami(principal: Agent, state: State) -> dict[str, Any]:
+    """Which tenant and plan this API key belongs to (so a client need not be told its tenant)."""
+    plan = state.plan_of(principal.org_id)
+    return {"tenant_id": principal.org_id, "key_id": principal.api_key_id, "plan": plan.id}
+
+
 # ------------------------------------------------------------------------------------- audit
 
 

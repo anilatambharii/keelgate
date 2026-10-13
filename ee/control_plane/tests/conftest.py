@@ -6,6 +6,7 @@ when ``KEELGATE_REQUIRE_INTEGRATION=1``; otherwise they skip with a reason.
 
 from __future__ import annotations
 
+import contextlib
 import os
 import uuid
 from collections.abc import Iterator
@@ -40,11 +41,12 @@ def _dsn(user: str, database: str) -> str:
 def _ensure_role(admin: psycopg.Connection[Any], name: str) -> None:
     exists = admin.execute("SELECT 1 FROM pg_roles WHERE rolname = %s", (name,)).fetchone()
     if exists is None:
-        admin.execute(
-            sql.SQL("CREATE ROLE {} LOGIN PASSWORD {} NOSUPERUSER NOBYPASSRLS NOCREATEDB").format(
-                sql.Identifier(name), sql.Literal(ROLE_PASSWORD)
+        with contextlib.suppress(psycopg.errors.DuplicateObject):  # created by another session
+            admin.execute(
+                sql.SQL(
+                    "CREATE ROLE {} LOGIN PASSWORD {} NOSUPERUSER NOBYPASSRLS NOCREATEDB"
+                ).format(sql.Identifier(name), sql.Literal(ROLE_PASSWORD))
             )
-        )
 
 
 @pytest.fixture(scope="session")

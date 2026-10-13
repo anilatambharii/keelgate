@@ -29,6 +29,8 @@ class Settings:
     allow_live_stripe: bool = False
     session_ttl_hours: int = 12
     cors_origins: tuple[str, ...] = ("http://localhost:3000",)
+    # Lets an OIDC issuer be plain http and/or on a private network (a local IdP). Never in prod.
+    oidc_allow_http: bool = False
 
     def __post_init__(self) -> None:
         if len(self.secret_key) < _REQUIRED_SECRET_LENGTH:
@@ -59,6 +61,7 @@ class Settings:
             stripe_api_base=env.get("KEELGATE_CP_STRIPE_API_BASE") or None,
             allow_live_stripe=env.get("KEELGATE_CP_ALLOW_LIVE_STRIPE") == "1",
             session_ttl_hours=int(env.get("KEELGATE_CP_SESSION_TTL_HOURS", "12")),
+            oidc_allow_http=env.get("KEELGATE_CP_OIDC_ALLOW_HTTP") == "1",
             cors_origins=tuple(
                 o
                 for o in env.get("KEELGATE_CP_CORS_ORIGINS", "http://localhost:3000").split(",")

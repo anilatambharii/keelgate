@@ -37,7 +37,10 @@ class RouteIn(_Body):
 
 def _view(request: Any) -> dict[str, Any]:
     data: dict[str, Any] = request.model_dump(mode="json")
-    data["signoff_code_required"] = request.tier is ApprovalTier.EXPLICIT_SIGNOFF
+    explicit = request.tier is ApprovalTier.EXPLICIT_SIGNOFF
+    data["signoff_code_required"] = explicit
+    # Shown to the signed-in approver, as the CLI does: typing it back proves they read it.
+    data["signoff_code"] = request.signoff_code if explicit else None
     return data
 
 

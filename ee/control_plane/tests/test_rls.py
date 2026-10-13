@@ -13,7 +13,8 @@ from keelgate_cloud.db import Database
 TENANT_TABLES = [
     "orgs", "users", "sessions", "api_keys", "sso_configs", "sso_states", "audit_records",
     "agents", "idempotency_keys", "approvals", "approval_routes", "policy_packs",
-    "policy_versions", "policy_active", "usage_daily", "usage_reports", "traces",
+    "policy_versions", "policy_active", "policy_deployments", "usage_daily", "usage_reports",
+    "traces",
 ]  # fmt: skip
 
 
@@ -290,3 +291,37 @@ def test_the_org_context_does_not_leak_to_the_next_transaction_on_a_reused_conne
             assert conn.execute("SELECT count(*) AS n FROM users").fetchone() == {"n": 0}
     finally:
         single.close()
+
+
+def test_no_policy_loosens_the_org_table_beyond_tenant_isolation_and_lookups(db: Database) -> None:
+    """Enumeration jobs use org_index, so `orgs` keeps only its tenant and lookup rules."""
+    with db.tx() as conn:
+        names = {
+            r["policyname"]
+            for r in conn.execute("SELECT policyname FROM pg_policies WHERE tablename = 'orgs'")
+        }
+    assert names == {"tenant_isolation"}
+
+
+def test_the_org_index_is_read_only_for_the_application_and_holds_no_pii(
+    db: Database, two_orgs: dict[str, Any]
+) -> None:
+    with db.tx() as conn:
+        columns = {
+            r["column_name"]
+            for r in conn.execute(
+                "SELECT column_name FROM information_schema.columns WHERE table_name = 'org_index'"
+            )
+        }
+        assert columns == {"org_id", "plan", "billing_status", "has_subscription"}
+        assert {str(r["org_id"]) for r in conn.execute("SELECT org_id FROM org_index")} >= {
+            two_orgs["a"],
+            two_orgs["b"],
+        }
+    for statement in (
+        "UPDATE org_index SET plan = 'business'",
+        "DELETE FROM org_index",
+        "INSERT INTO org_index VALUES (gen_random_uuid(), 'x', 'active', true)",
+    ):
+        with pytest.raises(psycopg.errors.InsufficientPrivilege), db.tx() as conn:
+            conn.execute(statement)

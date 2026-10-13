@@ -1,0 +1,56 @@
+{
+  "id": "__EVENT__",
+  "object": "event",
+  "api_version": "2025-09-30.clover",
+  "created": 1760000000,
+  "livemode": false,
+  "pending_webhooks": 1,
+  "request": {
+    "id": null,
+    "idempotency_key": null
+  },
+  "type": "customer.subscription.updated",
+  "data": {
+    "object": {
+      "id": "__SUB__",
+      "object": "subscription",
+      "customer": "__CUSTOMER__",
+      "status": "active",
+      "cancel_at_period_end": false,
+      "created": 1760000000,
+      "trial_end": null,
+      "metadata": {
+        "org_id": "__ORG__",
+        "keelgate_plan": "business"
+      },
+      "items": {
+        "object": "list",
+        "data": [
+          {
+            "id": "si_test_1",
+            "object": "subscription_item",
+            "quantity": 1,
+            "price": {
+              "id": "price_test_business_monthly",
+              "object": "price",
+              "active": true,
+              "currency": "usd",
+              "unit_amount": 49900,
+              "lookup_key": "keelgate_business_monthly",
+              "product": "prod_test_business",
+              "metadata": {
+                "keelgate_plan": "business",
+                "keelgate_kind": "base"
+              },
+              "recurring": {
+                "interval": "month",
+                "interval_count": 1,
+                "usage_type": "licensed"
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}
